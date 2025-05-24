@@ -6,11 +6,10 @@ from .user import (
     UserInDB,
     UserResponse
 )
-from .plan import (
+from dto.plan import (
     PlanBase,
     PlanCreate,
     PlanUpdate,
-    PlanInDB,
     PlanResponse
 )
 from .task import (
