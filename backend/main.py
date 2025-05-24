@@ -26,10 +26,6 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-# Создаем директорию для загрузок, если она не существует
-UPLOAD_DIR = Path("uploads")
-UPLOAD_DIR.mkdir(exist_ok=True)
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:

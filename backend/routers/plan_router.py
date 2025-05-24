@@ -4,7 +4,7 @@ from typing import List
 
 from database import get_db
 from services.plan_service import PlanService
-from dto.plan import PlanCreate, PlanResponse
+from dto.plan import PlanCreate, PlanResponse, PlanUpdate
 from auth.dependencies import get_current_active_user
 from models.user import User
 
@@ -54,4 +54,40 @@ async def get_plan(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Plan not found"
         )
-    return plan 
+    return plan
+
+@router.patch("/{plan_id}", response_model=PlanResponse)
+async def update_plan(
+    plan_id: int,
+    plan_data: PlanUpdate,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Обновляет план"""
+    plan_service = PlanService(db)
+    plan = await plan_service.update_plan(
+        user_id=current_user.id,
+        plan_id=plan_id,
+        plan_data=plan_data.dict(exclude_unset=True)
+    )
+    if not plan:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Plan not found"
+        )
+    return plan
+
+@router.delete("/{plan_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_plan(
+    plan_id: int,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Удаляет план"""
+    plan_service = PlanService(db)
+    success = await plan_service.delete_plan(current_user.id, plan_id)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Plan not found"
+        ) 

@@ -5,6 +5,7 @@
 /salt
 /hash
 /hash.txt
+.env
 /backend/env
 /backend/.env
 /backend/.env.local

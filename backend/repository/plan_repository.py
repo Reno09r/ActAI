@@ -48,15 +48,24 @@ class PlanRepository:
         milestone = Milestone(**milestone_data)
         self.session.add(milestone)
         await self.session.flush()
+        await self.session.commit()
+        await self.session.refresh(milestone)
         return milestone
 
     async def create_task(self, task_data: dict) -> Task:
         task = Task(**task_data)
         self.session.add(task)
         await self.session.flush()
+        await self.session.commit()
+        await self.session.refresh(task)
         return task
 
     async def get_plan_tasks(self, plan_id: int) -> List[Task]:
         query = select(Task).where(Task.plan_id == plan_id)
+        result = await self.session.execute(query)
+        return result.scalars().all()
+
+    async def get_milestone_tasks(self, milestone_id: int) -> List[Task]:
+        query = select(Task).where(Task.milestone_id == milestone_id)
         result = await self.session.execute(query)
         return result.scalars().all()

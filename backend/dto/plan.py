@@ -8,8 +8,8 @@ class TaskBase(BaseModel):
     due_date: datetime
     priority: str = "medium"
     estimated_hours: Optional[float] = None
-    actual_hours: Optional[float] = None
     ai_suggestion: Optional[str] = None
+    status: str = "pending"
 
 class TaskCreate(TaskBase):
     pass
@@ -20,7 +20,6 @@ class TaskUpdate(BaseModel):
     due_date: Optional[datetime] = None
     priority: Optional[str] = None
     estimated_hours: Optional[float] = None
-    actual_hours: Optional[float] = None
     status: Optional[str] = None
 
 class TaskResponse(TaskBase):
@@ -28,9 +27,6 @@ class TaskResponse(TaskBase):
     user_id: int
     plan_id: int
     milestone_id: int
-    status: str
-    created_at: datetime
-    updated_at: datetime
 
     class Config:
         from_attributes = True
@@ -78,7 +74,6 @@ class PlanUpdate(BaseModel):
 class PlanResponse(PlanBase):
     id: int
     user_id: int
-    ai_generated_plan_overview: Optional[str] = None
     status: str
     start_date: datetime
     end_date: datetime

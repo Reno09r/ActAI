@@ -467,7 +467,7 @@ class OptimizedLLMService:
         max_tokens_step2: int = 600, 
         max_tokens_step3: int = 400,
         temperature: float = 0.7
-    ) -> str:
+    ) -> Dict:
         """Генерация полного плана со всеми деталями с параллельной обработкой"""
         logging.info(f"Starting full plan generation for: '{user_objective}'")
         
@@ -481,17 +481,29 @@ class OptimizedLLMService:
             milestone_titles = basic_plan.pop("milestone_titles_to_create", [])
             if not milestone_titles:
                 logging.error("No milestones generated in step 1")
-                return json.dumps({
+                return {
                     "error": "No milestones generated", 
                     "basic_plan": basic_plan
-                }, indent=2, ensure_ascii=False)
+                }
             
-            basic_plan["milestones"] = []
+            # Создаем структуру плана
+            plan = {
+                "title": basic_plan["plan_title"],
+                "description": basic_plan["plan_summary"],
+                "estimated_duration_weeks": basic_plan["estimated_total_duration_weeks"],
+                "weekly_commitment_hours": basic_plan["suggested_weekly_commitment_hours"],
+                "difficulty_level": basic_plan["difficulty_level"],
+                "prerequisites": basic_plan["prerequisites"],
+                "start_date": datetime.now(),
+                "end_date": datetime.now() + timedelta(weeks=basic_plan["estimated_total_duration_weeks"]),
+                "progress_percentage": 0.0,
+                "milestones": []
+            }
             
             # Шаг 2: Параллельная генерация деталей этапов
             logging.info(f"Step 2: Generating details for {len(milestone_titles)} milestones in parallel...")
             milestone_details_list = await self._generate_milestone_details_parallel(
-                user_objective, basic_plan["plan_title"], 
+                user_objective, plan["title"], 
                 milestone_titles, max_tokens_step2, temperature
             )
             
@@ -499,11 +511,14 @@ class OptimizedLLMService:
             for i, milestone_details in enumerate(milestone_details_list):
                 if isinstance(milestone_details, Exception):
                     logging.error(f"Failed to generate milestone '{milestone_titles[i]}': {milestone_details}")
-                    milestone_details = {
-                        "milestone_title": milestone_titles[i],
-                        "milestone_description": f"Complete milestone: {milestone_titles[i]}",
-                        "tasks": []
-                    }
+                    continue
+                
+                milestone = {
+                    "title": milestone_details["milestone_title"],
+                    "description": milestone_details["milestone_description"],
+                    "order": i + 1,
+                    "tasks": []
+                }
                 
                 # Параллельная генерация задач для этапа
                 task_titles = milestone_details.get("task_titles_to_create", [])
@@ -514,33 +529,34 @@ class OptimizedLLMService:
                     )
                     
                     # Обработка результатов задач
-                    milestone_details["tasks"] = []
                     for j, task_details in enumerate(task_details_list):
                         if isinstance(task_details, Exception):
                             logging.error(f"Failed to generate task '{task_titles[j]}': {task_details}")
-                            task_details = {
-                                "task_title": task_titles[j],
-                                "task_description": f"Complete the task: {task_titles[j]}",
-                                "task_priority": "Medium",
-                                "task_estimated_hours": 2,
-                                "task_ai_suggestion": "Break this task into smaller steps"
-                            }
-                        milestone_details["tasks"].append(task_details)
+                            continue
+                            
+                        task = {
+                            "title": task_details["task_title"],
+                            "description": task_details["task_description"],
+                            "due_date": plan["start_date"] + timedelta(days=(i * 7) + j),
+                            "priority": task_details["task_priority"].lower(),
+                            "estimated_hours": task_details["task_estimated_hours"],
+                            "ai_suggestion": task_details["task_ai_suggestion"],
+                            "status": "pending"
+                        }
+                        milestone["tasks"].append(task)
                 
-                # Удаляем временное поле
-                milestone_details.pop("task_titles_to_create", None)
-                basic_plan["milestones"].append(milestone_details)
+                plan["milestones"].append(milestone)
             
             logging.info("Full plan generation completed successfully")
-            return json.dumps(basic_plan, indent=2, ensure_ascii=False)
+            return plan
             
         except Exception as e:
             logging.error(f"Full plan generation failed: {str(e)}")
-            return json.dumps({
+            return {
                 "error": f"Plan generation failed: {str(e)}",
                 "user_objective": user_objective,
                 "desired_plan_duration": desired_plan_duration
-            }, indent=2, ensure_ascii=False)
+            }
 
     def __del__(self):
         """Очистка ресурсов"""
