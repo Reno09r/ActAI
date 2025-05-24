@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
 
@@ -19,7 +19,8 @@ class MilestoneRepository:
 
     async def get_milestone_by_id(self, milestone_id: int) -> Optional[Milestone]:
         query = select(Milestone).where(Milestone.id == milestone_id).options(
-            selectinload(Milestone.tasks)
+            selectinload(Milestone.tasks),
+            selectinload(Milestone.plan)
         )
         result = await self.session.execute(query)
         return result.scalar_one_or_none()
@@ -34,4 +35,10 @@ class MilestoneRepository:
             selectinload(Milestone.tasks)
         )
         result = await self.session.execute(query)
-        return result.scalars().all() 
+        return result.scalars().all()
+
+    async def update_milestone(self, milestone_id: int, milestone_data: dict) -> Optional[Milestone]:
+        query = update(Milestone).where(Milestone.id == milestone_id).values(**milestone_data).returning(Milestone)
+        result = await self.session.execute(query)
+        await self.session.commit()
+        return result.scalar_one_or_none() 

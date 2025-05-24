@@ -1,5 +1,6 @@
 from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
+from datetime import datetime
 
 from repository.task_repository import TaskRepository
 from repository.plan_repository import PlanRepository
@@ -9,6 +10,28 @@ class TaskService:
     def __init__(self, session: AsyncSession):
         self.task_repository = TaskRepository(session)
         self.plan_repository = PlanRepository(session)
+
+    async def update_task(
+        self, 
+        user_id: int, 
+        task_id: int, 
+        task_data: Dict[str, Any]
+    ) -> Optional[Task]:
+        """Обновляет задание"""
+        task = await self.task_repository.get_task_by_id(task_id)
+        if not task or task.user_id != user_id:
+            return None
+
+        # Удаляем системные поля
+        task_data.pop('user_id', None)
+        task_data.pop('plan_id', None)
+        task_data.pop('milestone_id', None)
+        task_data.pop('ai_suggestion', None)
+
+        updated_task = await self.task_repository.update_task(task_id, task_data)
+        if updated_task:
+            await self._update_plan_progress(task.plan_id)
+        return updated_task
 
     async def update_task_status(
         self, 
@@ -39,19 +62,6 @@ class TaskService:
         return await self.plan_repository.update_plan(plan_id, {
             "progress_percentage": progress
         })
-
-    async def update_task(
-        self, 
-        user_id: int, 
-        task_id: int, 
-        task_data: Dict[str, Any]
-    ) -> Optional[Task]:
-        """Обновляет задание"""
-        task = await self.task_repository.get_task_by_id(task_id)
-        if not task or task.user_id != user_id:
-            return None
-
-        return await self.task_repository.update_task(task_id, task_data)
 
     async def get_milestone_tasks(self, milestone_id: int) -> List[Task]:
         """Получает все задания этапа"""

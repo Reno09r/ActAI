@@ -5,7 +5,7 @@ import logging.config
 import traceback
 from auth import auth_router
 from database import saengine, Base, init_db
-from routers import user_router, llm_router, plan_router
+from routers import user_router, llm_router, plan_router, task_router, milestone_router
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware import Middleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -76,6 +76,8 @@ app.include_router(auth_router.router)
 app.include_router(user_router)
 app.include_router(llm_router)
 app.include_router(plan_router)
+app.include_router(task_router)
+app.include_router(milestone_router)
 if __name__=='__main__':
     logger.info("Starting application...")
     uvicorn.run("main:app", reload=True, workers=3, port=8003)

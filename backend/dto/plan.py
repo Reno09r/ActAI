@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
+from pydantic import validator
 
 class TaskBase(BaseModel):
     title: str
@@ -15,12 +16,20 @@ class TaskCreate(TaskBase):
     pass
 
 class TaskUpdate(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
+    title: Optional[str] = Field(None, min_length=1, max_length=255)
+    description: Optional[str] = Field(None, max_length=1000)
     due_date: Optional[datetime] = None
-    priority: Optional[str] = None
-    estimated_hours: Optional[float] = None
-    status: Optional[str] = None
+    priority: Optional[str] = Field(None, pattern="^(low|medium|high)$")
+    estimated_hours: Optional[float] = Field(None, ge=0)
+    actual_hours: Optional[float] = Field(None, ge=0)
+    status: Optional[str] = Field(None, pattern="^(pending|in_progress|completed)$")
+
+    @validator('actual_hours')
+    def validate_actual_hours(cls, v, values):
+        if v is not None and 'estimated_hours' in values and values['estimated_hours'] is not None:
+            if v < values['estimated_hours']:
+                raise ValueError('Фактическое время не может быть меньше предполагаемого')
+        return v
 
 class TaskResponse(TaskBase):
     id: int
@@ -84,4 +93,8 @@ class PlanResponse(PlanBase):
     updated_at: datetime
 
     class Config:
-        from_attributes = True 
+        from_attributes = True
+
+class MilestoneUpdateRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=255)
+    description: Optional[str] = Field(None, max_length=1000) 

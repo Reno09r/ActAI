@@ -10,7 +10,7 @@ from models.user import User
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
-@router.patch("/{task_id}", response_model=TaskResponse)
+@router.put("/{task_id}", response_model=TaskResponse)
 async def update_task(
     task_id: int,
     task_data: TaskUpdate,
