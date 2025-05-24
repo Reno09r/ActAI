@@ -4,12 +4,17 @@ from datetime import datetime, date
 
 from repository.task_repository import TaskRepository
 from repository.plan_repository import PlanRepository
+from repository.milestone_repository import MilestoneRepository
+from services.llm_service import LLMService
 from models import Task
+from dto.plan import TaskResponse
 
 class TaskService:
     def __init__(self, session: AsyncSession):
         self.task_repository = TaskRepository(session)
         self.plan_repository = PlanRepository(session)
+        self.milestone_repository = MilestoneRepository(session)
+        self.llm_service = LLMService.get_instance()
 
     async def update_task(
         self, 
@@ -89,4 +94,54 @@ class TaskService:
         return await self.task_repository.get_tasks_by_status(
             user_id=user_id,
             status=status
-        ) 
+        )
+
+    async def adapt_task(
+        self,
+        user_id: int,
+        task_id: int,
+        user_message: str
+    ) -> Optional[TaskResponse]:
+        """Адаптирует задачу на основе сообщения пользователя"""
+        # Получаем задачу и проверяем права доступа
+        task = await self.task_repository.get_task_by_id(task_id)
+        if not task or task.user_id != user_id:
+            return None
+            
+        # Получаем этап
+        milestone = await self.milestone_repository.get_milestone_by_id(task.milestone_id)
+        if not milestone:
+            return None
+            
+        # Получаем рекомендации от ИИ
+        adaptation = await self.llm_service.analyze_and_adapt_task(
+            task=task,
+            milestone=milestone,
+            user_message=user_message
+        )
+        
+        # Подготавливаем данные для обновления
+        update_data = {
+            "title": task.title,
+            "description": task.description,
+            "priority": adaptation["priority"].lower()
+        }
+        
+        # Добавляем изменения из рекомендаций
+        if adaptation["changes"]:
+            update_data["description"] = (update_data["description"] or "") + "\n\nChanges:\n" + "\n".join(adaptation["changes"])
+        
+        # Обновляем сроки если они указаны
+        if adaptation["new_timeline"]:
+            try:
+                new_date = datetime.fromisoformat(adaptation["new_timeline"][0])
+                update_data["due_date"] = new_date
+            except (ValueError, IndexError):
+                pass
+                
+        # Обновляем задачу
+        updated_task_data = await self.task_repository.adapt_task(task_id, update_data)
+        if updated_task_data:
+            await self._update_plan_progress(task.plan_id)
+            return TaskResponse(**updated_task_data)
+        return None 

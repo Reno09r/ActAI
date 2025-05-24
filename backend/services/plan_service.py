@@ -7,7 +7,7 @@ from repository.plan_repository import PlanRepository
 from repository.milestone_repository import MilestoneRepository
 from repository.task_repository import TaskRepository
 from services.llm_service import LLMService
-from models import Plan
+from models import Plan, Task
 
 def datetime_handler(obj):
     """Обработчик для сериализации datetime объектов в JSON"""
@@ -112,4 +112,4 @@ class PlanService:
             updated_plan = await self.plan_repository.update_plan(plan_id, plan_data)
             return updated_plan
         except Exception as e:
-            raise Exception(f"Failed to update plan: {str(e)}") 
+            raise Exception(f"Failed to update plan: {str(e)}")

@@ -4,7 +4,7 @@ from typing import List
 
 from database import get_db
 from services.plan_service import PlanService
-from dto.plan import PlanCreate, PlanResponse, PlanUpdate
+from dto.plan import PlanCreate, PlanResponse, PlanUpdate, TaskResponse
 from auth.dependencies import get_current_active_user
 from models.user import User
 
@@ -101,4 +101,4 @@ async def delete_plan(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Plan not found"
-        ) 
+        )

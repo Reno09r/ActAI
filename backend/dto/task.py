@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from typing import Optional, List, Annotated
-from pydantic import StringConstraints, Field
+from pydantic import BaseModel, StringConstraints, Field
 from .base import TimestampedDTO
 
 class TaskBase(TimestampedDTO):
@@ -30,3 +30,6 @@ class TaskResponse(TaskBase):
     id: int
     plan_id: int
     user_id: int 
+
+class TaskAdaptationRequest(BaseModel):
+    user_message: str 

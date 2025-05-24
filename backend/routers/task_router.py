@@ -3,7 +3,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from datetime import datetime, timedelta
 from enum import Enum
+from pydantic import BaseModel
 
+from dto.task import TaskAdaptationRequest
 from database import get_db
 from services.task_service import TaskService
 from dto.plan import TaskResponse, TaskUpdate
@@ -117,4 +119,25 @@ async def get_upcoming_tasks(
         start_date=today,
         end_date=three_days_later
     )
-    return tasks 
+    return tasks
+
+@router.post("/{task_id}/adapt", response_model=TaskResponse)
+async def adapt_task(
+    task_id: int,
+    adaptation_data: TaskAdaptationRequest,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Адаптирует задачу на основе сообщения пользователя"""
+    task_service = TaskService(db)
+    task = await task_service.adapt_task(
+        user_id=current_user.id,
+        task_id=task_id,
+        user_message=adaptation_data.user_message
+    )
+    if not task:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Task not found"
+        )
+    return task 

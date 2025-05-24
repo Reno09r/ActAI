@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, and_
 from typing import List, Optional
-from datetime import date
+from datetime import date, datetime
 
 from models import Task
 
@@ -68,4 +68,33 @@ class TaskRepository:
             )
         ).order_by(Task.due_date)
         result = await self.session.execute(query)
-        return result.scalars().all() 
+        return result.scalars().all()
+
+    async def adapt_task(self, task_id: int, adaptation_data: dict) -> Optional[dict]:
+        """Адаптирует задачу на основе рекомендаций ИИ"""
+        task = await self.get_task_by_id(task_id)
+        if not task:
+            return None
+            
+        # Обновляем задачу
+        for key, value in adaptation_data.items():
+            if hasattr(task, key):
+                setattr(task, key, value)
+                
+        await self.session.commit()
+        await self.session.refresh(task)
+        
+        # Возвращаем словарь с данными задачи
+        return {
+            "id": task.id,
+            "title": task.title,
+            "description": task.description,
+            "due_date": task.due_date,
+            "priority": task.priority,
+            "estimated_hours": task.estimated_hours,
+            "status": task.status,
+            "ai_suggestion": task.ai_suggestion,
+            "user_id": task.user_id,
+            "plan_id": task.plan_id,
+            "milestone_id": task.milestone_id
+        } 

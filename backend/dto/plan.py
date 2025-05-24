@@ -97,4 +97,4 @@ class PlanResponse(PlanBase):
 
 class MilestoneUpdateRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=255)
-    description: Optional[str] = Field(None, max_length=1000) 
+    description: Optional[str] = Field(None, max_length=1000)

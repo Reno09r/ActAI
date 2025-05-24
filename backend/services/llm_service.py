@@ -14,6 +14,8 @@ from openai import AsyncOpenAI
 from datetime import datetime, timedelta
 from collections import OrderedDict
 
+from models import Task, Milestone
+
 # Добавляем путь к родительской директории
 sys.path.append(str(Path(__file__).parent.parent))
 
@@ -814,6 +816,73 @@ END
         self._plan_context["additional_info"][milestone_id] = response_text
         
         return json.dumps({"additional_info": response_text}, indent=2, ensure_ascii=False)
+
+    async def analyze_and_adapt_task(
+        self,
+        task: Task,
+        milestone: Milestone,
+        user_message: str
+    ) -> Dict[str, Any]:
+        """Анализирует и адаптирует задачу на основе сообщения пользователя"""
+        prompt = f"""
+Task: "{task.title}"
+Milestone: "{milestone.title}"
+User message: Please, provide a helpful message to adapt the task. "{user_message}"
+Analyze the situation and provide task adaptation:
+
+FORMAT:
+Analysis:
+- [Key observation about the task]
+- [Pattern or trend noticed]
+Action: [Split/Modify/Reschedule]
+Changes:
+- [Specific change 1]
+- [Specific change 2]
+New timeline:
+- [Updated deadline or schedule]
+Priority: [High/Medium/Low]
+END
+        """
+        response = await self._generate_with_openai(prompt, max_tokens=400, temperature=0.7)
+        return self._parse_task_adaptation(response)
+
+    def _parse_task_adaptation(self, text_response: str) -> Dict[str, Any]:
+        """Парсит адаптацию задачи"""
+        data = {
+            "analysis": [],
+            "action": "",
+            "changes": [],
+            "new_timeline": [],
+            "priority": "Medium"
+        }
+        
+        current_section = None
+        for line in text_response.split('\n'):
+            line = line.strip()
+            if not line:
+                continue
+                
+            if line.lower().startswith("analysis:"):
+                current_section = "analysis"
+                continue
+            elif line.lower().startswith("action:"):
+                data["action"] = line.split(":", 1)[1].strip()
+            elif line.lower().startswith("changes:"):
+                current_section = "changes"
+                continue
+            elif line.lower().startswith("new timeline:"):
+                current_section = "new_timeline"
+                continue
+            elif line.lower().startswith("priority:"):
+                data["priority"] = line.split(":", 1)[1].strip()
+            elif line.lower() == "end":
+                break
+            elif line.startswith("- "):
+                item = line[2:].strip()
+                if current_section in data:
+                    data[current_section].append(item)
+        
+        return data
 
 
 # Алиас для обратной совместимости

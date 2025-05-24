@@ -26,6 +26,7 @@ import {
 import CreateProjectModal from "./CreateProjectModal"
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
+import TaskAdaptationModal from './TaskAdaptationModal'
 
 // Добавляем тип для статусов задач
 type TaskStatus = "pending" | "in_progress" | "completed";
@@ -128,6 +129,8 @@ const Dashboard: React.FC = () => {
   const [inProgressTasks, setInProgressTasks] = useState<Task[]>([]);
   const [isLoadingInProgress, setIsLoadingInProgress] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null)
+  const [isAdaptationModalOpen, setIsAdaptationModalOpen] = useState(false);
+  const [adaptingTaskId, setAdaptingTaskId] = useState<number | null>(null);
   const navigate = useNavigate();
 
   const handleCreateSuccess = () => {
@@ -974,6 +977,41 @@ const Dashboard: React.FC = () => {
     return prerequisites.replace(/[\[\]"]/g, '')
   }
 
+  const handleAdaptTask = async (taskId: number, message: string) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/adapt`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ user_message: message }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.detail || 'Ошибка при адаптации задачи');
+      }
+
+      const updatedTask = await response.json();
+
+      // Обновляем все данные
+      await Promise.all([
+        fetchProjects(),
+        fetchTasksByDate(),
+        fetchInProgressTasks()
+      ]);
+
+    } catch (err) {
+      throw new Error(err instanceof Error ? err.message : 'Ошибка при адаптации задачи');
+    }
+  };
+
+  const openAdaptationModal = (taskId: number) => {
+    setAdaptingTaskId(taskId);
+    setIsAdaptationModalOpen(true);
+  };
+
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center text-gray-600">
@@ -1426,7 +1464,7 @@ const Dashboard: React.FC = () => {
                                     ? "bg-yellow-100 text-yellow-700"
                                     : task.priority === "low" 
                                       ? "bg-green-100 text-green-700" 
-                                      : "bg-gray-100 text-gray-700" // Default for other/null priorities
+                                      : "bg-gray-100 text-gray-700"
                               }`}
                             >
                               {task.priority || "N/A"}
@@ -1539,7 +1577,16 @@ const Dashboard: React.FC = () => {
                     </>
                   )}
                 </div>
-                <TaskStatusButton task={selectedTask} />
+                <div className="flex items-center space-x-2">
+                  <TaskStatusButton task={selectedTask} />
+                  <button
+                    onClick={() => openAdaptationModal(selectedTask.id)}
+                    className="p-2 text-gray-500 hover:text-blue-600 transition-colors"
+                    title="Адаптировать задачу"
+                  >
+                    <Settings className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 p-4 border rounded-lg bg-gray-50">
@@ -1607,6 +1654,21 @@ const Dashboard: React.FC = () => {
         onClose={() => setIsCreateModalOpen(false)}
         onSuccess={handleCreateSuccess}
       />
+
+      {/* Добавляем модальное окно адаптации */}
+      {adaptingTaskId && (
+        <TaskAdaptationModal
+          isOpen={isAdaptationModalOpen}
+          onClose={() => {
+            setIsAdaptationModalOpen(false);
+            setAdaptingTaskId(null);
+          }}
+          onAdapt={async (message) => {
+            await handleAdaptTask(adaptingTaskId, message);
+          }}
+          taskTitle={selectedTask?.title || ''}
+        />
+      )}
     </div>
   )
 }
