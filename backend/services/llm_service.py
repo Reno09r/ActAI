@@ -127,10 +127,11 @@ class OptimizedLLMService:
 
     def __init__(self):
         """Оптимизированная инициализация"""
-        if not os.getenv("OPENAI_API_KEY"):
-            raise RuntimeError("OPENAI_API_KEY not found in environment variables")
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise RuntimeError("OPENAI_API_KEY not found in environment variables. Please check your .env file and make sure it's properly configured.")
         
-        self.client = AsyncOpenAI()
+        self.client = AsyncOpenAI(api_key=api_key)
         
         if OptimizedLLMService._thread_pool is None:
             OptimizedLLMService._thread_pool = ThreadPoolExecutor(
