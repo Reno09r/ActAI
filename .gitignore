@@ -1,0 +1,15 @@
+/enc
+/dec
+/key
+/iv
+/salt
+/hash
+/hash.txt
+/backend/env
+/backend/.env
+/backend/.env.local
+/backend/.env.development
+/backend/.env.production
+/backend/.env.test
+/backend/.env.development.local
+/backend/.env.production.local
