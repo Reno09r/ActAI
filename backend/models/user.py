@@ -16,4 +16,3 @@ class User(Base):
     plans = relationship("Plan", back_populates="user", cascade="all, delete-orphan")
     tasks = relationship("Task", back_populates="user", cascade="all, delete-orphan")
     daily_checkins = relationship("DailyCheckin", back_populates="user", cascade="all, delete-orphan")
-    ai_generated_content = relationship("AiGeneratedContent", back_populates="user", cascade="all, delete-orphan") 

@@ -8,7 +8,6 @@ class Plan(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     title = Column(String(255), nullable=False)
     description = Column(Text)
-    ai_generated_plan_overview = Column(Text)
     status = Column(String(50), default="active", index=True)
     start_date = Column(DateTime, nullable=False)
     end_date = Column(DateTime, nullable=False)
