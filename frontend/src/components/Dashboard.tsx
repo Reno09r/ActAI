@@ -27,6 +27,8 @@ import CreateProjectModal from "./CreateProjectModal"
 import { useAuth } from '../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import TaskAdaptationModal from './TaskAdaptationModal'
+import VoiceRecordButton from './VoiceRecordButton'
+import { useToast } from '../contexts/ToastContext'
 
 // Добавляем тип для статусов задач
 type TaskStatus = "pending" | "in_progress" | "completed";
@@ -97,6 +99,7 @@ interface TasksByDate {
 
 const Dashboard: React.FC = () => {
   const { token, logout } = useAuth();
+  const { showToast } = useToast();
   const [projects, setProjects] = useState<Project[]>([])
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
@@ -1012,6 +1015,75 @@ const Dashboard: React.FC = () => {
     setIsAdaptationModalOpen(true);
   };
 
+  const handleRecordingComplete = async (audioBlob: Blob) => {
+    try {
+      const formData = new FormData();
+      formData.append('audio_file', audioBlob, 'recording.mp3');
+
+      // Отправляем аудио на сервер для транскрибации
+      const response = await fetch(`${API_BASE_URL}/audio/stt/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Ошибка при обработке аудио');
+      }
+
+      const data = await response.json();
+      
+      // Создаем новый проект на основе транскрибированного текста
+      const projectResponse = await fetch(`${API_BASE_URL}/plans/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          objective: data.processed_text,
+          duration: '4 weeks',
+        }),
+      });
+
+      if (!projectResponse.ok) {
+        throw new Error('Ошибка при создании проекта');
+      }
+
+      const project = await projectResponse.json();
+      
+      // Получаем озвучку информации о проекте
+      const ttsResponse = await fetch(`${API_BASE_URL}/audio/tts/`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text: `Проект "${project.title}" создан. ${project.description}`,
+          gender: 'M',
+        }),
+      });
+
+      if (!ttsResponse.ok) {
+        throw new Error('Ошибка при генерации речи');
+      }
+
+      const ttsAudioBlob = await ttsResponse.blob();
+      const audioUrl = URL.createObjectURL(ttsAudioBlob);
+      const audio = new Audio(audioUrl);
+      await audio.play();
+
+      showToast('Проект успешно создан!', 'success');
+      fetchProjects(); // Обновляем список проектов
+    } catch (error) {
+      console.error('Error:', error);
+      showToast('Произошла ошибка при создании проекта', 'error');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center text-gray-600">
@@ -1046,13 +1118,16 @@ const Dashboard: React.FC = () => {
           {view === "projects" || !selectedProject ? (
             <div>
               <h2 className="text-lg font-semibold text-gray-800">My Projects</h2>
-              <button 
-                onClick={() => setIsCreateModalOpen(true)}
-                className="w-full mt-3 flex items-center justify-between px-3 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
-              >
-                <span className="font-medium">New Project</span>
-                <Plus className="h-4 w-4" />
-              </button>
+              <div className="mt-2 space-x-4">
+                <VoiceRecordButton onRecordingComplete={handleRecordingComplete} />
+                <button 
+                  onClick={() => setIsCreateModalOpen(true)}
+                  className="w-full mt-3 flex items-center justify-between px-3 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                >
+                  <span className="font-medium">New Project</span>
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           ) : (
             <div>

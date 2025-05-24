@@ -40,7 +40,6 @@ class PlanService:
             "user_id": user_id,
             "title": plan_data["title"],
             "description": plan_data["description"],
-            "ai_generated_plan_overview": json.dumps(plan_data, default=datetime_handler),
             "start_date": plan_data["start_date"],
             "end_date": plan_data["end_date"],
             "estimated_duration_weeks": plan_data["estimated_duration_weeks"],

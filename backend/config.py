@@ -22,3 +22,5 @@ HASH = os.getenv("HASH", "default_hash_for_development")
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "default_jwt_secret_for_development")
 JWT_ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 1200
+GEN_TEMP = 0.6
+SAMPLE_RATE = 24000

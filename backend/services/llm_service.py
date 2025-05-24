@@ -27,15 +27,15 @@ def timing_decorator(func):
         try:
             result = await func(*args, **kwargs)
             elapsed = time.time() - start_time
-            logging.info(f"{func.__name__} completed in {elapsed:.2f}s")
+            print(f"{func.__name__} completed in {elapsed:.2f}s")
             return result
         except Exception as e:
             elapsed = time.time() - start_time
-            logging.error(f"{func.__name__} failed after {elapsed:.2f}s: {str(e)}")
+            print(f"{func.__name__} failed after {elapsed:.2f}s: {str(e)}")
             raise
     return wrapper
 
-def retry_on_failure(max_retries=2, delay=1.0):
+def retry_on_failure(max_retries=5, delay=1.0):
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
@@ -46,10 +46,10 @@ def retry_on_failure(max_retries=2, delay=1.0):
                 except Exception as e:
                     last_exception = e
                     if attempt < max_retries:
-                        logging.warning(f"{func.__name__} failed (attempt {attempt + 1}/{max_retries + 1}): {str(e)}. Retrying in {delay}s...")
+                        print(f"{func.__name__} failed (attempt {attempt + 1}/{max_retries + 1}): {str(e)}. Retrying in {delay}s...")
                         await asyncio.sleep(delay)
                     else:
-                        logging.error(f"{func.__name__} failed after {max_retries + 1} attempts")
+                        print(f"{func.__name__} failed after {max_retries + 1} attempts")
                         raise last_exception
         return wrapper
     return decorator
@@ -139,7 +139,7 @@ class OptimizedLLMService:
     
     # Константы для оптимизации
     MAX_WORKERS = 15  # Увеличиваем количество воркеров
-    GENERATION_TIMEOUT = 30  # Оптимизируем таймаут
+    GENERATION_TIMEOUT = 60  # Оптимизируем таймаут
     CACHE_SIZE = 200  # Увеличиваем размер кэша
     CACHE_TTL = 3600  # TTL для кэша в секундах
     
@@ -167,14 +167,14 @@ class OptimizedLLMService:
         
         self._cache = OrderedDict()
         self._cache_timestamps = {}
-        logging.info("OptimizedLLMService initialized successfully")
+        print("OptimizedLLMService initialized successfully")
 
     @classmethod
     def clear_context(cls):
         """Очищает контекст плана"""
         with cls._initialization_lock:
             cls._plan_context = {}
-            logging.info("LLMService context cleared.")
+            print("LLMService context cleared.")
 
     def _get_cache_key(self, prompt: str, max_tokens: int, temperature: float) -> str:
         """Создает ключ для кэширования"""
@@ -227,7 +227,7 @@ class OptimizedLLMService:
 
     def _parse_step1_basic_plan_fast(self, text_response: str) -> Dict[str, Any]:
         """Улучшенный парсер для базового плана"""
-        logging.debug(f"Parsing step 1 response: {text_response[:200]}...")
+        print(f"Parsing step 1 response: {text_response[:200]}...")
         
         data = {
             "plan_title": "Learning Plan", 
@@ -263,7 +263,7 @@ class OptimizedLLMService:
                     if numbers:
                         data["estimated_total_duration_weeks"] = int(numbers[0])
                 except (IndexError, ValueError) as e:
-                    logging.warning(f"Failed to parse duration: {e}")
+                    print(f"Failed to parse duration: {e}")
                 current_section = None
             elif line_lower.startswith("weekly:"):
                 data["suggested_weekly_commitment_hours"] = line.split(":", 1)[1].strip()
@@ -288,12 +288,12 @@ class OptimizedLLMService:
                     if item:  # Проверяем что элемент не пустой
                         data["milestone_titles_to_create"].append(item)
         
-        logging.debug(f"Parsed plan data: {data}")
+        print(f"Parsed plan data: {data}")
         return data
 
     def _parse_step2_milestone_details_fast(self, text_response: str, milestone_title: str) -> Dict[str, Any]:
         """Улучшенный парсер для деталей этапа"""
-        logging.debug(f"Parsing step 2 response for {milestone_title}: {text_response[:200]}...")
+        print(f"Parsing step 2 response for {milestone_title}: {text_response[:200]}...")
         
         data = {
             "milestone_title": milestone_title,
@@ -324,12 +324,12 @@ class OptimizedLLMService:
                 if task:  # Проверяем что задача не пустая
                     data["task_titles_to_create"].append(task)
         
-        logging.debug(f"Parsed milestone data: {data}")
+        print(f"Parsed milestone data: {data}")
         return data
 
     def _parse_step3_task_details_fast(self, text_response: str, task_title: str) -> Dict[str, Any]:
         """Улучшенный парсер для деталей задачи"""
-        logging.debug(f"Parsing step 3 response for {task_title}: {text_response[:200]}...")
+        print(f"Parsing step 3 response for {task_title}: {text_response[:200]}...")
         
         data = {
             "task_title": task_title,
@@ -361,13 +361,13 @@ class OptimizedLLMService:
                     if numbers:
                         data["task_estimated_hours"] = int(numbers[0])
                 except (IndexError, ValueError) as e:
-                    logging.warning(f"Failed to parse hours: {e}")
+                    print(f"Failed to parse hours: {e}")
             elif line_lower.startswith("tip:"):
                 data["task_ai_suggestion"] = line.split(":", 1)[1].strip()
             elif line_lower == "end":
                 break
         
-        logging.debug(f"Parsed task data: {data}")
+        print(f"Parsed task data: {data}")
         return data
 
     async def _generate_with_openai(self, prompt: str, max_tokens: int, temperature: float) -> str:
@@ -375,7 +375,7 @@ class OptimizedLLMService:
         cache_key = self._get_cache_key(prompt, max_tokens, temperature)
         
         if cache_key in self._cache:
-            logging.debug("Cache hit for prompt")
+            print("Cache hit for prompt")
             return self._cache[cache_key]
         
         try:
@@ -397,11 +397,11 @@ class OptimizedLLMService:
             
             result = self._clean_llm_text_output(response.choices[0].message.content)
             self._update_cache(cache_key, result)
-            logging.debug(f"OpenAI response: {result[:200]}...")
+            print(f"OpenAI response: {result[:200]}...")
             return result
             
         except Exception as e:
-            logging.error(f"OpenAI API error: {str(e)}")
+            print(f"OpenAI API error: {str(e)}")
             raise
 
     @timing_decorator
@@ -560,14 +560,14 @@ class OptimizedLLMService:
         temperature: float = 0.7
     ) -> Dict:
         """Генерация полного плана со всеми деталями с параллельной обработкой"""
-        logging.info(f"Starting full plan generation for: '{user_objective}'")
+        print(f"Starting full plan generation for: '{user_objective}'")
         
         try:
             # Извлекаем количество недель из desired_plan_duration
             plan_duration_weeks = int(''.join(filter(str.isdigit, desired_plan_duration)))
             
             # Шаг 1: Базовый план
-            logging.info("Step 1: Generating basic plan...")
+            print("Step 1: Generating basic plan...")
             basic_plan = await self._llm_generate_step1_basic_plan(
                 user_objective, desired_plan_duration, max_tokens_step1, temperature
             )
@@ -577,7 +577,7 @@ class OptimizedLLMService:
             milestone_titles = basic_plan.pop("milestone_titles_to_create", [])[:optimal_milestones]
             
             if not milestone_titles:
-                logging.error("No milestones generated in step 1")
+                print("No milestones generated in step 1")
                 return {
                     "error": "No milestones generated", 
                     "basic_plan": basic_plan
@@ -601,7 +601,7 @@ class OptimizedLLMService:
             }
             
             # Шаг 2: Параллельная генерация деталей этапов
-            logging.info(f"Step 2: Generating details for {len(milestone_titles)} milestones in parallel...")
+            print(f"Step 2: Generating details for {len(milestone_titles)} milestones in parallel...")
             milestone_details_list = await self._generate_milestone_details_parallel(
                 user_objective, plan["title"], 
                 milestone_titles, max_tokens_step2, temperature
@@ -610,7 +610,7 @@ class OptimizedLLMService:
             # Обработка результатов этапов
             for i, milestone_details in enumerate(milestone_details_list):
                 if isinstance(milestone_details, Exception):
-                    logging.error(f"Failed to generate milestone '{milestone_titles[i]}': {milestone_details}")
+                    print(f"Failed to generate milestone '{milestone_titles[i]}': {milestone_details}")
                     continue
                 
                 # Ограничиваем количество задач для этапа
@@ -628,7 +628,7 @@ class OptimizedLLMService:
                 
                 # Параллельная генерация задач для этапа
                 if task_titles:
-                    logging.info(f"Step 3: Generating {len(task_titles)} tasks for milestone '{milestone_titles[i]}' in parallel...")
+                    print(f"Step 3: Generating {len(task_titles)} tasks for milestone '{milestone_titles[i]}' in parallel...")
                     task_details_list = await self._generate_task_details_parallel(
                         milestone_titles[i], task_titles, plan_duration_weeks, max_tokens_step3, temperature
                     )
@@ -642,7 +642,7 @@ class OptimizedLLMService:
                     # Обработка результатов задач
                     for j, task_details in enumerate(task_details_list):
                         if isinstance(task_details, Exception):
-                            logging.error(f"Failed to generate task '{task_titles[j]}': {task_details}")
+                            print(f"Failed to generate task '{task_titles[j]}': {task_details}")
                             continue
                             
                         # Рассчитываем дату выполнения задачи с учетом приоритета
@@ -666,11 +666,11 @@ class OptimizedLLMService:
                 
                 plan["milestones"].append(milestone)
             
-            logging.info("Full plan generation completed successfully")
+            print("Full plan generation completed successfully")
             return plan
             
         except Exception as e:
-            logging.error(f"Full plan generation failed: {str(e)}")
+            print(f"Full plan generation failed: {str(e)}")
             return {
                 "error": f"Plan generation failed: {str(e)}",
                 "user_objective": user_objective,
@@ -692,7 +692,7 @@ class OptimizedLLMService:
         temperature: float = 0.7
     ) -> str:
         """Генерация базового плана (шаг 1)"""
-        logging.info(f"Starting basic plan generation for: '{user_objective}'")
+        print(f"Starting basic plan generation for: '{user_objective}'")
         
         self._plan_context = {
             "user_objective": user_objective,
@@ -725,7 +725,7 @@ class OptimizedLLMService:
             raise ValueError(f"Invalid milestone_id: {milestone_id}")
             
         milestone_title = milestone_titles[milestone_id]
-        logging.info(f"Generating details for milestone: {milestone_title}")
+        print(f"Generating details for milestone: {milestone_title}")
         
         milestone_details = await self._llm_generate_step2_milestone_detail(
             user_objective, basic_plan["plan_title"], milestone_title,
@@ -758,7 +758,7 @@ class OptimizedLLMService:
             raise ValueError(f"Invalid task_id: {task_id}")
             
         task_title = task_titles[task_id]
-        logging.info(f"Generating details for task: {task_title} in milestone: {milestone['milestone_title']}")
+        print(f"Generating details for task: {task_title} in milestone: {milestone['milestone_title']}")
         
         task_details = await self._llm_generate_step3_task_detail(
             milestone["milestone_title"], task_title, len(task_titles), max_tokens, temperature

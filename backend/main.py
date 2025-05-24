@@ -4,8 +4,9 @@ import uvicorn
 import logging.config
 import traceback
 from auth import auth_router
+from model_registry import get_whisper_model, get_tts_model, get_xtts_model
 from database import saengine, Base, init_db
-from routers import user_router, llm_router, plan_router, task_router, milestone_router, daily_checkin_router
+from routers import user_router, llm_router, plan_router, task_router, milestone_router, daily_checkin_router, audio_router
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware import Middleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -14,12 +15,23 @@ from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 import sys
 import os
+from logging.handlers import RotatingFileHandler
+
+# Создаем директорию для логов
+log_dir = Path("logs")
+log_dir.mkdir(exist_ok=True)
 
 # Настройка логирования
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
+        RotatingFileHandler(
+            filename=log_dir / "app.log",
+            maxBytes=10*1024*1024,  # 10MB
+            backupCount=5,
+            encoding='utf-8'
+        ),
         logging.StreamHandler(sys.stdout)
     ]
 )
@@ -33,7 +45,9 @@ async def lifespan(app: FastAPI):
         logger.info("Initializing database...")
         await init_db()
         logger.info("Database initialized successfully!")
-
+        get_whisper_model()
+        get_tts_model()
+        get_xtts_model()
     except Exception as e:
         logger.error(f"Error during startup: {str(e)}")
         logger.error(traceback.format_exc())
@@ -79,6 +93,7 @@ app.include_router(plan_router)
 app.include_router(task_router)
 app.include_router(milestone_router)
 app.include_router(daily_checkin_router.router)
+app.include_router(audio_router.router)
 if __name__=='__main__':
     logger.info("Starting application...")
     uvicorn.run("main:app", reload=True, workers=3, port=8003)

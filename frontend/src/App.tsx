@@ -5,6 +5,7 @@ import Header from './components/Header';
 import Dashboard from './components/Dashboard';
 import DailyCheckin from './components/DailyCheckin';
 import { AuthProvider } from './contexts/AuthContext';
+import { ToastProvider } from './contexts/ToastContext';
 
 // Ленивая загрузка компонентов
 const Hero = lazy(() => import('./components/Hero'));
@@ -33,48 +34,50 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
 const App = () => {
   return (
     <AuthProvider>
-      <div className="min-h-screen bg-white">
-        <Header />
-        <main>
-          <Suspense fallback={<LoadingSpinner />}>
-            <Routes>
-              <Route path="/" element={<Hero />} />
-              <Route 
-                path="/dashboard" 
-                element={
-                  <ProtectedRoute>
-                    <div className="h-screen">
-                      <Dashboard />
-                    </div>
-                  </ProtectedRoute>
-                } 
-              />
-              <Route 
-                path="/login" 
-                element={
-                  <PublicRoute>
-                    <div className="pt-16">
-                      <Login />
-                    </div>
-                  </PublicRoute>
-                } 
-              />
-              <Route 
-                path="/register" 
-                element={
-                  <PublicRoute>
-                    <div className="pt-16">
-                      <Register />
-                    </div>
-                  </PublicRoute>
-                } 
-              />
-              <Route path="/daily-checkin" element={<DailyCheckin />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </Suspense>
-        </main>
-      </div>
+      <ToastProvider>
+        <div className="min-h-screen bg-white">
+          <Header />
+          <main>
+            <Suspense fallback={<LoadingSpinner />}>
+              <Routes>
+                <Route path="/" element={<Hero />} />
+                <Route 
+                  path="/dashboard" 
+                  element={
+                    <ProtectedRoute>
+                      <div className="h-screen">
+                        <Dashboard />
+                      </div>
+                    </ProtectedRoute>
+                  } 
+                />
+                <Route 
+                  path="/login" 
+                  element={
+                    <PublicRoute>
+                      <div className="pt-16">
+                        <Login />
+                      </div>
+                    </PublicRoute>
+                  } 
+                />
+                <Route 
+                  path="/register" 
+                  element={
+                    <PublicRoute>
+                      <div className="pt-16">
+                        <Register />
+                      </div>
+                    </PublicRoute>
+                  } 
+                />
+                <Route path="/daily-checkin" element={<DailyCheckin />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Suspense>
+          </main>
+        </div>
+      </ToastProvider>
     </AuthProvider>
   );
 };
