@@ -29,6 +29,7 @@ import { useNavigate } from 'react-router-dom'
 import TaskAdaptationModal from './TaskAdaptationModal'
 import VoiceRecordButton from './VoiceRecordButton'
 import { useToast } from '../contexts/ToastContext'
+import DotsAnimation from './DotsAnimation'
 
 // Добавляем тип для статусов задач
 type TaskStatus = "pending" | "in_progress" | "completed";
@@ -134,7 +135,37 @@ const Dashboard: React.FC = () => {
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [isAdaptationModalOpen, setIsAdaptationModalOpen] = useState(false);
   const [adaptingTaskId, setAdaptingTaskId] = useState<number | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
   const navigate = useNavigate();
+  const [sidebarWidth, setSidebarWidth] = useState(320); // Начальная ширина сайдбара
+  const [isResizing, setIsResizing] = useState(false);
+  const sidebarRef = useRef<HTMLDivElement>(null);
+
+  // Добавляем обработчики для изменения размера
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return;
+      
+      const newWidth = e.clientX;
+      if (newWidth >= 240 && newWidth <= 480) { // Минимальная и максимальная ширина
+        setSidebarWidth(newWidth);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing]);
 
   const handleCreateSuccess = () => {
     // Перезагружаем список проектов после успешного создания
@@ -230,6 +261,9 @@ const Dashboard: React.FC = () => {
           newCompletedTasks[task.id] = true;
         } else if (task.status === "in_progress") {
           newInProgressTasks.push(task);
+          newCompletedTasks[task.id] = false;
+        } else { // 'pending' и другие
+          newCompletedTasks[task.id]  = false; // Явно не завершена
         }
       });
 
@@ -263,6 +297,15 @@ const Dashboard: React.FC = () => {
       }
       const tasks = await response.json();
       setInProgressTasks(tasks);
+      setCompletedTasks(prevCompleted => {
+        const updatedCompleted = { ...prevCompleted };
+        for (const task of tasks) {
+          if (updatedCompleted[task.id]) { // Если была помечена как completed
+            updatedCompleted[task.id] = false; // Снимаем отметку
+          }
+        }
+        return updatedCompleted;
+      });
     } catch (err) {
       console.error('Error fetching in-progress tasks:', err);
     } finally {
@@ -535,7 +578,21 @@ const Dashboard: React.FC = () => {
     );
   };
 
-  // Обновляем компонент для отображения статуса задачи
+  // Добавляем функцию форматирования статуса
+  const formatTaskStatus = (status: string): string => {
+    switch (status.toLowerCase()) {
+      case 'in_progress':
+        return 'In Progress';
+      case 'pending':
+        return 'Pending';
+      case 'completed':
+        return 'Completed';
+      default:
+        return status.charAt(0).toUpperCase() + status.slice(1);
+    }
+  };
+
+  // Обновляем компонент TaskStatusButton
   const TaskStatusButton = ({ task }: { task: Task }) => {
     const getStatusIcon = () => {
       if (completedTasks[task.id]) {
@@ -557,26 +614,29 @@ const Dashboard: React.FC = () => {
       }
     };
 
-    const getNextStatus = (): TaskStatus => {
+    const getStatusText = () => {
       if (completedTasks[task.id]) {
-        return "pending";
+        return "Completed";
       } else if (inProgressTasks.some(t => t.id === task.id)) {
-        return "completed";
+        return "In Progress";
       } else {
-        return "in_progress";
+        return "Pending";
       }
     };
 
     return (
       <button
         onClick={() => toggleTaskCompletion(task.id)}
-        className={`p-2 rounded-full ${getStatusColor()} hover:opacity-80 transition-opacity`}
+        className={`p-2 rounded-full ${getStatusColor()} hover:opacity-80 transition-opacity flex items-center gap-1`}
         disabled={updatingTaskId === task.id}
       >
         {updatingTaskId === task.id ? (
           <Loader2 className="w-4 h-4 animate-spin" />
         ) : (
-          getStatusIcon()
+          <>
+            {getStatusIcon()}
+            <span className="text-xs font-medium">{getStatusText()}</span>
+          </>
         )}
       </button>
     );
@@ -1062,7 +1122,7 @@ const Dashboard: React.FC = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          text: `Проект "${project.title}" создан. ${project.description}`,
+          text: `Project "${project.title}" created. ${project.description}`,
           gender: 'M',
         }),
       });
@@ -1074,13 +1134,25 @@ const Dashboard: React.FC = () => {
       const ttsAudioBlob = await ttsResponse.blob();
       const audioUrl = URL.createObjectURL(ttsAudioBlob);
       const audio = new Audio(audioUrl);
+      
+      // Добавляем обработчики событий для аудио
+      audio.onplay = () => setIsPlaying(true);
+      audio.onended = () => setIsPlaying(false);
+      audio.onerror = () => setIsPlaying(false);
+      
       await audio.play();
 
-      showToast('Проект успешно создан!', 'success');
+      showToast('Project created!', 'success');
       fetchProjects(); // Обновляем список проектов
     } catch (error) {
       console.error('Error:', error);
       showToast('Произошла ошибка при создании проекта', 'error');
+    } finally {
+      // Сбрасываем состояние isProcessing в VoiceRecordButton
+      const voiceRecordButton = document.querySelector('.voice-record-button') as HTMLElement;
+      if (voiceRecordButton) {
+        voiceRecordButton.dispatchEvent(new CustomEvent('recording-complete'));
+      }
     }
   };
 
@@ -1112,21 +1184,28 @@ const Dashboard: React.FC = () => {
   return (
     <div className="flex h-screen bg-gray-100">
       {/* Sidebar */}
-      <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
+      <div 
+        ref={sidebarRef}
+        className="bg-white border-r border-gray-200 flex flex-col relative"
+        style={{ width: `${sidebarWidth}px`, minWidth: '240px', maxWidth: '480px' }}
+      >
         {/* Header */}
         <div className="p-4 border-b border-gray-200">
           {view === "projects" || !selectedProject ? (
             <div>
               <h2 className="text-lg font-semibold text-gray-800">My Projects</h2>
-              <div className="mt-2 space-x-4">
-                <VoiceRecordButton onRecordingComplete={handleRecordingComplete} />
+              <div className="mt-2 flex items-center space-x-2">
                 <button 
                   onClick={() => setIsCreateModalOpen(true)}
-                  className="w-full mt-3 flex items-center justify-between px-3 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+                  className="flex-1 flex items-center justify-between px-3 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
                 >
                   <span className="font-medium">New Project</span>
                   <Plus className="h-4 w-4" />
                 </button>
+                <div className="flex items-center">
+                  <VoiceRecordButton onRecordingComplete={handleRecordingComplete} />
+                  {isPlaying && <DotsAnimation />}
+                </div>
               </div>
             </div>
           ) : (
@@ -1292,6 +1371,15 @@ const Dashboard: React.FC = () => {
           </button>
         </div>
       </div>
+
+      {/* Resizer */}
+      <div
+        className={`absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500 transition-colors ${
+          isResizing ? 'bg-blue-500' : 'bg-transparent'
+        }`}
+        style={{ left: `${sidebarWidth}px` }}
+        onMouseDown={() => setIsResizing(true)}
+      />
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col bg-white">
@@ -1694,15 +1782,17 @@ const Dashboard: React.FC = () => {
                   <span
                     className={`ml-2 px-3 py-0.5 rounded-full text-xs font-semibold ${
                       completedTasks[selectedTask.id]
-                        ? "bg-green-100 text-green-800" // Reflect checkbox state
-                        : selectedTask.status === "pending"
-                          ? "bg-gray-100 text-gray-800"
-                          : selectedTask.status === "in_progress"
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-green-100 text-green-800" // Default for other statuses
+                        ? "bg-green-100 text-green-800"
+                        : inProgressTasks.some(t => t.id === selectedTask.id)
+                          ? "bg-blue-100 text-blue-800"
+                          : "bg-gray-100 text-gray-800"
                     }`}
                   >
-                    {completedTasks[selectedTask.id] ? "Completed" : selectedTask.status}
+                    {completedTasks[selectedTask.id] 
+                      ? "Completed" 
+                      : inProgressTasks.some(t => t.id === selectedTask.id)
+                        ? "In Progress"
+                        : "Pending"}
                   </span>
                 </div>
               </div>

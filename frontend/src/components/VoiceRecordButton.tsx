@@ -1,9 +1,13 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { FaMicrophone, FaStop } from 'react-icons/fa';
+import { Loader2 } from 'lucide-react';
 import styled from 'styled-components';
 
-const Button = styled.button<{ isRecording: boolean }>`
-  background: ${props => props.isRecording ? '#ff4444' : '#4CAF50'};
+const Button = styled.button<{ isRecording: boolean; isProcessing: boolean }>`
+  background: ${props => {
+    if (props.isProcessing) return '#4a5568';
+    return props.isRecording ? '#ff4444' : '#4CAF50';
+  }};
   color: white;
   border: none;
   border-radius: 50%;
@@ -17,12 +21,20 @@ const Button = styled.button<{ isRecording: boolean }>`
   margin-left: 20px;
 
   &:hover {
-    transform: scale(1.1);
-    background: ${props => props.isRecording ? '#ff0000' : '#45a049'};
+    transform: ${props => props.isProcessing ? 'none' : 'scale(1.1)'};
+    background: ${props => {
+      if (props.isProcessing) return '#4a5568';
+      return props.isRecording ? '#ff0000' : '#45a049';
+    }};
   }
 
   &:active {
-    transform: scale(0.95);
+    transform: ${props => props.isProcessing ? 'none' : 'scale(0.95)'};
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.7;
   }
 `;
 
@@ -32,8 +44,27 @@ interface VoiceRecordButtonProps {
 
 const VoiceRecordButton: React.FC<VoiceRecordButtonProps> = ({ onRecordingComplete }) => {
   const [isRecording, setIsRecording] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const handleRecordingComplete = () => {
+      setIsProcessing(false);
+    };
+
+    const button = buttonRef.current;
+    if (button) {
+      button.addEventListener('recording-complete', handleRecordingComplete);
+    }
+
+    return () => {
+      if (button) {
+        button.removeEventListener('recording-complete', handleRecordingComplete);
+      }
+    };
+  }, []);
 
   const startRecording = async () => {
     try {
@@ -50,6 +81,7 @@ const VoiceRecordButton: React.FC<VoiceRecordButtonProps> = ({ onRecordingComple
 
       mediaRecorder.onstop = () => {
         const audioBlob = new Blob(chunksRef.current, { type: 'audio/mp3' });
+        setIsProcessing(true);
         onRecordingComplete(audioBlob);
         stream.getTracks().forEach(track => track.stop());
       };
@@ -78,11 +110,21 @@ const VoiceRecordButton: React.FC<VoiceRecordButtonProps> = ({ onRecordingComple
 
   return (
     <Button 
+      ref={buttonRef}
+      className="voice-record-button"
       isRecording={isRecording} 
+      isProcessing={isProcessing}
       onClick={handleClick}
-      title={isRecording ? "Остановить запись" : "Начать запись"}
+      disabled={isProcessing}
+      title={isProcessing ? "Обработка..." : isRecording ? "Остановить запись" : "Начать запись"}
     >
-      {isRecording ? <FaStop /> : <FaMicrophone />}
+      {isProcessing ? (
+        <Loader2 className="w-5 h-5 animate-spin" />
+      ) : isRecording ? (
+        <FaStop />
+      ) : (
+        <FaMicrophone />
+      )}
     </Button>
   );
 };

@@ -6,7 +6,7 @@ import traceback
 from auth import auth_router
 from model_registry import get_whisper_model, get_tts_model, get_xtts_model
 from database import saengine, Base, init_db
-from routers import user_router, llm_router, plan_router, task_router, milestone_router, daily_checkin_router, audio_router
+from routers import user_router, plan_router, task_router, milestone_router, daily_checkin_router, audio_router
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware import Middleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -88,12 +88,11 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 app.include_router(auth_router.router)
 app.include_router(user_router)
-app.include_router(llm_router)
 app.include_router(plan_router)
 app.include_router(task_router)
 app.include_router(milestone_router)
 app.include_router(daily_checkin_router.router)
-app.include_router(audio_router.router)
+app.include_router(audio_router)
 if __name__=='__main__':
     logger.info("Starting application...")
     uvicorn.run("main:app", reload=True, workers=3, port=8003)

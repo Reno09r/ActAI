@@ -44,7 +44,13 @@ class PlanRepository:
             for key, value in plan_data.items():
                 if hasattr(plan, key):
                     setattr(plan, key, value)
-
+            plan.updated_at = datetime.utcnow()
+            if 'progress_percentage' in plan_data:
+                plan.progress_percentage = plan_data['progress_percentage']
+                if plan.progress_percentage >= 100:
+                    plan.status = 'completed'
+                elif plan.progress_percentage < 100:
+                    plan.status = 'active'
             await self.session.commit()
             await self.session.refresh(plan)
             return plan
@@ -57,29 +63,8 @@ class PlanRepository:
         result = await self.session.execute(query)
         await self.session.commit()
         return result.rowcount > 0
-
-    async def create_milestone(self, milestone_data: dict) -> Milestone:
-        milestone = Milestone(**milestone_data)
-        self.session.add(milestone)
-        await self.session.flush()
-        await self.session.commit()
-        await self.session.refresh(milestone)
-        return milestone
-
-    async def create_task(self, task_data: dict) -> Task:
-        task = Task(**task_data)
-        self.session.add(task)
-        await self.session.flush()
-        await self.session.commit()
-        await self.session.refresh(task)
-        return task
-
+    
     async def get_plan_tasks(self, plan_id: int) -> List[Task]:
         query = select(Task).where(Task.plan_id == plan_id)
-        result = await self.session.execute(query)
-        return result.scalars().all()
-
-    async def get_milestone_tasks(self, milestone_id: int) -> List[Task]:
-        query = select(Task).where(Task.milestone_id == milestone_id)
         result = await self.session.execute(query)
         return result.scalars().all()
