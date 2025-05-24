@@ -21,9 +21,11 @@ import {
   Loader2, // For loading state
   PlayCircle, // Для in progress
   Clock as ClockIcon, // Для pending
+  LogOut,
 } from "lucide-react"
 import CreateProjectModal from "./CreateProjectModal"
 import { useAuth } from '../contexts/AuthContext'
+import { useNavigate } from 'react-router-dom'
 
 // Добавляем тип для статусов задач
 type TaskStatus = "pending" | "in_progress" | "completed";
@@ -93,7 +95,7 @@ interface TasksByDate {
 }
 
 const Dashboard: React.FC = () => {
-  const { token } = useAuth();
+  const { token, logout } = useAuth();
   const [projects, setProjects] = useState<Project[]>([])
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
@@ -126,6 +128,7 @@ const Dashboard: React.FC = () => {
   const [inProgressTasks, setInProgressTasks] = useState<Task[]>([]);
   const [isLoadingInProgress, setIsLoadingInProgress] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null)
+  const navigate = useNavigate();
 
   const handleCreateSuccess = () => {
     // Перезагружаем список проектов после успешного создания
@@ -1159,10 +1162,20 @@ const Dashboard: React.FC = () => {
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-200">
-          <button className="w-full flex items-center px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
-            <Settings className="h-4 w-4 mr-2" />
-            <span>Settings</span>
+        <div className="p-4 border-t border-gray-200 space-y-2">
+          <button 
+            onClick={() => navigate('/daily-checkin')}
+            className="w-full flex items-center px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <Calendar className="h-4 w-4 mr-2" />
+            <span>Everyday Check-in</span>
+          </button>
+          <button 
+            onClick={logout}
+            className="w-full flex items-center px-3 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            <span>Logout</span>
           </button>
         </div>
       </div>

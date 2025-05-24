@@ -8,8 +8,13 @@ const Header: React.FC = () => {
   const location = useLocation();
   const isDashboard = location.pathname === '/dashboard';
 
+  // Не рендерим header на странице dashboard
+  if (isDashboard) {
+    return null;
+  }
+
   return (
-    <header className={`${!isDashboard ? 'fixed top-0 left-0 right-0 z-10' : ''} bg-white/80 backdrop-blur-md p-4 shadow-sm`}>
+    <header className="fixed top-0 left-0 right-0 z-10 bg-white/80 backdrop-blur-md p-4 shadow-sm">
       <div className="container mx-auto flex justify-between items-center">
         <Link to="/" className="flex items-center space-x-2">
           <Brain className="h-8 w-8 text-blue-500" />
