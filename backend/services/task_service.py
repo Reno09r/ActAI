@@ -1,6 +1,6 @@
 from typing import List, Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime
+from datetime import datetime, date
 
 from repository.task_repository import TaskRepository
 from repository.plan_repository import PlanRepository
@@ -65,4 +65,28 @@ class TaskService:
 
     async def get_milestone_tasks(self, milestone_id: int) -> List[Task]:
         """Получает все задания этапа"""
-        return await self.task_repository.get_plan_tasks(milestone_id) 
+        return await self.task_repository.get_plan_tasks(milestone_id)
+
+    async def get_tasks_by_date_range(
+        self,
+        user_id: int,
+        start_date: date,
+        end_date: date
+    ) -> List[Task]:
+        """Получает задачи в указанном диапазоне дат"""
+        return await self.task_repository.get_tasks_by_date_range(
+            user_id=user_id,
+            start_date=start_date,
+            end_date=end_date
+        )
+
+    async def get_tasks_by_status(
+        self,
+        user_id: int,
+        status: str
+    ) -> List[Task]:
+        """Получает задачи по статусу"""
+        return await self.task_repository.get_tasks_by_status(
+            user_id=user_id,
+            status=status
+        ) 

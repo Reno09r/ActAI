@@ -74,11 +74,17 @@ Milestones:
 - [Milestone 4 title]
 END
 
-Make sure each milestone represents a major learning achievement that builds toward the objective."""
+Important rules:
+1. For plans 1-2 weeks long, create only 2-3 milestones
+2. For plans 3-4 weeks long, create 3-4 milestones
+3. For plans longer than 4 weeks, create 4-5 milestones
+4. Each milestone should represent a major learning achievement
+5. Make sure milestones are evenly distributed across the plan duration"""
 
 STEP_2_MILESTONE_DETAIL_PROMPT = """Plan: "{plan_title}"
 Milestone to detail: "{milestone_title}"
 Other milestones in plan: {all_milestone_titles_str}
+Plan duration: {plan_duration} weeks
 
 Create detailed information for this milestone. Follow this EXACT format:
 
@@ -90,20 +96,38 @@ Tasks:
 - [Specific task 4 - be concrete and actionable]
 END
 
-Each task should be a clear, actionable item that contributes to completing the milestone."""
+Important rules:
+1. For 1-2 week plans, create 2-3 tasks per milestone
+2. For 3-4 week plans, create 3-4 tasks per milestone
+3. For longer plans, create 4-5 tasks per milestone
+4. Each task should be a clear, actionable item that contributes to completing the milestone
+5. Tasks should be evenly distributed across the milestone's time period"""
 
 STEP_3_TASK_DETAIL_PROMPT = """Milestone: "{milestone_title}"
 Task to detail: "{task_title}"
+Plan duration: {plan_duration} weeks
 
 Provide specific details for this task. Follow this EXACT format:
 
-Description: [2-3 sentences explaining exactly what needs to be done and how to approach it]
+Description: [2-3 sentences explaining exactly what needs to be done and how to approach it. Focus on building habits rather than daily tasks]
 Priority: [High, Medium, or Low]
 Hours: [Estimated hours as a number, like: 4]
-Tip: [One practical tip or suggestion for completing this task successfully]
+Tip: [One practical tip or suggestion for completing this task successfully. Focus on habit formation and consistent progress]
 END
 
-Be specific and actionable in your descriptions."""
+Important rules:
+1. Avoid phrases like "study every day" or "practice daily"
+2. Instead, use phrases like "build a habit of", "develop a routine of", "establish a practice of"
+3. Focus on sustainable learning habits rather than daily tasks
+4. Be specific and actionable in your descriptions
+5. Consider the overall plan duration when estimating hours"""
+
+# Константы для расчета оптимального количества этапов
+MIN_MILESTONES = 2
+MAX_MILESTONES = 5
+MIN_TASKS_PER_MILESTONE = 2
+MAX_TASKS_PER_MILESTONE = 5
+MIN_DAYS_BETWEEN_TASKS = 2
 
 class OptimizedLLMService:
     _instance = None
@@ -112,7 +136,7 @@ class OptimizedLLMService:
     _thread_pool = None
     
     # Константы для оптимизации
-    MAX_WORKERS = 5  # Увеличиваем количество воркеров
+    MAX_WORKERS = 15  # Увеличиваем количество воркеров
     GENERATION_TIMEOUT = 30  # Оптимизируем таймаут
     CACHE_SIZE = 200  # Увеличиваем размер кэша
     CACHE_TTL = 3600  # TTL для кэша в секундах
@@ -402,7 +426,8 @@ class OptimizedLLMService:
         prompt = STEP_2_MILESTONE_DETAIL_PROMPT.format(
             plan_title=plan_title,
             milestone_title=milestone_title,
-            all_milestone_titles_str=", ".join(all_milestone_titles)
+            all_milestone_titles_str=", ".join(all_milestone_titles),
+            plan_duration=len(all_milestone_titles)
         )
         
         response_text = await self._generate_with_openai(prompt, max_tokens, temperature)
@@ -411,12 +436,14 @@ class OptimizedLLMService:
     @timing_decorator  
     @retry_on_failure(max_retries=2, delay=1.0)
     async def _llm_generate_step3_task_detail(
-        self, milestone_title: str, task_title: str, max_tokens: int = 400, temperature: float = 0.7
+        self, milestone_title: str, task_title: str, plan_duration_weeks: int, 
+        max_tokens: int = 400, temperature: float = 0.7
     ) -> Dict[str, Any]:
         """Генерация деталей задачи"""
         prompt = STEP_3_TASK_DETAIL_PROMPT.format(
             milestone_title=milestone_title,
-            task_title=task_title
+            task_title=task_title,
+            plan_duration=plan_duration_weeks
         )
         
         response_text = await self._generate_with_openai(prompt, max_tokens, temperature)
@@ -445,6 +472,7 @@ class OptimizedLLMService:
         self,
         milestone_title: str,
         task_titles: List[str],
+        plan_duration_weeks: int,
         max_tokens: int = 400,
         temperature: float = 0.7
     ) -> List[Dict[str, Any]]:
@@ -452,11 +480,72 @@ class OptimizedLLMService:
         tasks = []
         for task_title in task_titles:
             task = self._llm_generate_step3_task_detail(
-                milestone_title, task_title, max_tokens, temperature
+                milestone_title, task_title, plan_duration_weeks, max_tokens, temperature
             )
             tasks.append(task)
         
         return await asyncio.gather(*tasks, return_exceptions=True)
+
+    def _calculate_optimal_milestones(self, plan_duration_weeks: int) -> int:
+        """Рассчитывает оптимальное количество этапов в зависимости от длительности плана"""
+        if plan_duration_weeks <= 2:
+            return min(3, max(2, plan_duration_weeks))
+        elif plan_duration_weeks <= 4:
+            return min(4, max(3, plan_duration_weeks))
+        else:
+            return min(MAX_MILESTONES, max(MIN_MILESTONES, plan_duration_weeks // 2))
+
+    def _calculate_optimal_tasks(self, plan_duration_weeks: int, milestone_index: int, total_milestones: int) -> int:
+        """Рассчитывает оптимальное количество задач для этапа"""
+        if plan_duration_weeks <= 2:
+            return min(3, max(2, plan_duration_weeks))
+        elif plan_duration_weeks <= 4:
+            return min(4, max(3, plan_duration_weeks))
+        else:
+            return min(MAX_TASKS_PER_MILESTONE, max(MIN_TASKS_PER_MILESTONE, plan_duration_weeks // total_milestones))
+
+    def _calculate_task_dates(self, start_date: datetime, end_date: datetime, 
+                            milestone_index: int, total_milestones: int,
+                            task_index: int, total_tasks: int,
+                            task_priority: str = "Medium") -> datetime:
+        """Рассчитывает дату выполнения задачи с учетом равномерного распределения и приоритета"""
+        total_days = (end_date - start_date).days
+        
+        # Рассчитываем границы этапа
+        milestone_duration = total_days / total_milestones
+        milestone_start = start_date + timedelta(days=milestone_duration * milestone_index)
+        milestone_end = milestone_start + timedelta(days=milestone_duration)
+        
+        # Определяем базовый интервал между задачами
+        min_interval = max(MIN_DAYS_BETWEEN_TASKS, milestone_duration / (total_tasks + 1))
+        
+        # Корректируем интервал в зависимости от приоритета
+        priority_multiplier = {
+            "high": 0.8,  # Высокий приоритет - задачи ближе к началу этапа
+            "medium": 1.0,  # Средний приоритет - равномерное распределение
+            "low": 1.2   # Низкий приоритет - задачи ближе к концу этапа
+        }.get(task_priority.lower(), 1.0)
+        
+        # Рассчитываем позицию задачи в этапе
+        task_position = (task_index + 1) / (total_tasks + 1)
+        task_position = task_position * priority_multiplier
+        
+        # Ограничиваем позицию в пределах этапа
+        task_position = max(0.1, min(0.9, task_position))
+        
+        # Рассчитываем дату выполнения
+        days_from_start = milestone_duration * task_position
+        task_date = milestone_start + timedelta(days=days_from_start)
+        
+        # Проверяем минимальный интервал с предыдущей задачей
+        if task_index > 0:
+            min_date = milestone_start + timedelta(days=min_interval * task_index)
+            task_date = max(task_date, min_date)
+        
+        # Проверяем, что дата не выходит за пределы этапа
+        task_date = min(task_date, milestone_end - timedelta(days=1))
+        
+        return task_date
 
     @timing_decorator
     async def generate_full_plan_step_by_step(
@@ -472,13 +561,19 @@ class OptimizedLLMService:
         logging.info(f"Starting full plan generation for: '{user_objective}'")
         
         try:
+            # Извлекаем количество недель из desired_plan_duration
+            plan_duration_weeks = int(''.join(filter(str.isdigit, desired_plan_duration)))
+            
             # Шаг 1: Базовый план
             logging.info("Step 1: Generating basic plan...")
             basic_plan = await self._llm_generate_step1_basic_plan(
                 user_objective, desired_plan_duration, max_tokens_step1, temperature
             )
             
-            milestone_titles = basic_plan.pop("milestone_titles_to_create", [])
+            # Ограничиваем количество этапов в зависимости от длительности плана
+            optimal_milestones = self._calculate_optimal_milestones(plan_duration_weeks)
+            milestone_titles = basic_plan.pop("milestone_titles_to_create", [])[:optimal_milestones]
+            
             if not milestone_titles:
                 logging.error("No milestones generated in step 1")
                 return {
@@ -487,15 +582,18 @@ class OptimizedLLMService:
                 }
             
             # Создаем структуру плана
+            start_date = datetime.now()
+            end_date = start_date + timedelta(weeks=plan_duration_weeks)
+            
             plan = {
                 "title": basic_plan["plan_title"],
                 "description": basic_plan["plan_summary"],
-                "estimated_duration_weeks": basic_plan["estimated_total_duration_weeks"],
+                "estimated_duration_weeks": plan_duration_weeks,
                 "weekly_commitment_hours": basic_plan["suggested_weekly_commitment_hours"],
                 "difficulty_level": basic_plan["difficulty_level"],
                 "prerequisites": basic_plan["prerequisites"],
-                "start_date": datetime.now(),
-                "end_date": datetime.now() + timedelta(weeks=basic_plan["estimated_total_duration_weeks"]),
+                "start_date": start_date,
+                "end_date": end_date,
                 "progress_percentage": 0.0,
                 "milestones": []
             }
@@ -513,6 +611,12 @@ class OptimizedLLMService:
                     logging.error(f"Failed to generate milestone '{milestone_titles[i]}': {milestone_details}")
                     continue
                 
+                # Ограничиваем количество задач для этапа
+                optimal_tasks = self._calculate_optimal_tasks(
+                    plan_duration_weeks, i, len(milestone_titles)
+                )
+                task_titles = milestone_details.get("task_titles_to_create", [])[:optimal_tasks]
+                
                 milestone = {
                     "title": milestone_details["milestone_title"],
                     "description": milestone_details["milestone_description"],
@@ -521,11 +625,16 @@ class OptimizedLLMService:
                 }
                 
                 # Параллельная генерация задач для этапа
-                task_titles = milestone_details.get("task_titles_to_create", [])
                 if task_titles:
                     logging.info(f"Step 3: Generating {len(task_titles)} tasks for milestone '{milestone_titles[i]}' in parallel...")
                     task_details_list = await self._generate_task_details_parallel(
-                        milestone_titles[i], task_titles, max_tokens_step3, temperature
+                        milestone_titles[i], task_titles, plan_duration_weeks, max_tokens_step3, temperature
+                    )
+                    
+                    # Сортируем задачи по приоритету для правильного распределения дат
+                    task_details_list = sorted(
+                        [t for t in task_details_list if not isinstance(t, Exception)],
+                        key=lambda x: {"high": 0, "medium": 1, "low": 2}.get(x.get("task_priority", "").lower(), 1)
                     )
                     
                     # Обработка результатов задач
@@ -534,10 +643,18 @@ class OptimizedLLMService:
                             logging.error(f"Failed to generate task '{task_titles[j]}': {task_details}")
                             continue
                             
+                        # Рассчитываем дату выполнения задачи с учетом приоритета
+                        task_date = self._calculate_task_dates(
+                            start_date, end_date,
+                            i, len(milestone_titles),
+                            j, len(task_details_list),
+                            task_details.get("task_priority", "Medium")
+                        )
+                            
                         task = {
                             "title": task_details["task_title"],
                             "description": task_details["task_description"],
-                            "due_date": plan["start_date"] + timedelta(days=(i * 7) + j),
+                            "due_date": task_date,
                             "priority": task_details["task_priority"].lower(),
                             "estimated_hours": task_details["task_estimated_hours"],
                             "ai_suggestion": task_details["task_ai_suggestion"],
@@ -642,7 +759,7 @@ class OptimizedLLMService:
         logging.info(f"Generating details for task: {task_title} in milestone: {milestone['milestone_title']}")
         
         task_details = await self._llm_generate_step3_task_detail(
-            milestone["milestone_title"], task_title, max_tokens, temperature
+            milestone["milestone_title"], task_title, len(task_titles), max_tokens, temperature
         )
         
         if "tasks" not in self._plan_context:

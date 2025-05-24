@@ -56,7 +56,7 @@ async def get_plan(
         )
     return plan
 
-@router.patch("/{plan_id}", response_model=PlanResponse)
+@router.put("/{plan_id}", response_model=PlanResponse)
 async def update_plan(
     plan_id: int,
     plan_data: PlanUpdate,
@@ -65,17 +65,28 @@ async def update_plan(
 ):
     """Обновляет план"""
     plan_service = PlanService(db)
-    plan = await plan_service.update_plan(
-        user_id=current_user.id,
-        plan_id=plan_id,
-        plan_data=plan_data.dict(exclude_unset=True)
-    )
-    if not plan:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Plan not found"
+    try:
+        plan = await plan_service.update_plan(
+            user_id=current_user.id,
+            plan_id=plan_id,
+            plan_data=plan_data.dict(exclude_unset=True)
         )
-    return plan
+        if not plan:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Plan not found"
+            )
+        return plan
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
 
 @router.delete("/{plan_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_plan(

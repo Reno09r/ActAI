@@ -33,10 +33,24 @@ class PlanRepository:
         return result.scalars().all()
 
     async def update_plan(self, plan_id: int, plan_data: dict) -> Optional[Plan]:
-        query = update(Plan).where(Plan.id == plan_id).values(**plan_data).returning(Plan)
-        result = await self.session.execute(query)
-        await self.session.commit()
-        return result.scalar_one_or_none()
+        """Обновляет план в базе данных"""
+        try:
+            # Получаем план с его связями
+            plan = await self.get_plan_by_id(plan_id)
+            if not plan:
+                return None
+
+            # Обновляем поля плана
+            for key, value in plan_data.items():
+                if hasattr(plan, key):
+                    setattr(plan, key, value)
+
+            await self.session.commit()
+            await self.session.refresh(plan)
+            return plan
+        except Exception as e:
+            await self.session.rollback()
+            raise e
 
     async def delete_plan(self, plan_id: int) -> bool:
         query = delete(Plan).where(Plan.id == plan_id)

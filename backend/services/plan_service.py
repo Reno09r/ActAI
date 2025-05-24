@@ -83,4 +83,33 @@ class PlanService:
 
     async def get_user_plans(self, user_id: int) -> List[Plan]:
         """Получает все планы пользователя"""
-        return await self.plan_repository.get_user_plans(user_id) 
+        return await self.plan_repository.get_user_plans(user_id)
+
+    async def update_plan(
+        self,
+        user_id: int,
+        plan_id: int,
+        plan_data: dict
+    ) -> Optional[Plan]:
+        """Обновляет план пользователя"""
+        # Проверяем существование плана и права доступа
+        plan = await self.get_user_plan(user_id, plan_id)
+        if not plan:
+            return None
+
+        # Валидация данных
+        if 'title' in plan_data and not plan_data['title'].strip():
+            raise ValueError("Title cannot be empty")
+
+        if 'description' in plan_data and len(plan_data['description']) > 1000:
+            raise ValueError("Description is too long (max 1000 characters)")
+
+        if 'prerequisites' in plan_data and len(plan_data['prerequisites']) > 2000:
+            raise ValueError("Prerequisites text is too long (max 2000 characters)")
+
+        # Обновляем план
+        try:
+            updated_plan = await self.plan_repository.update_plan(plan_id, plan_data)
+            return updated_plan
+        except Exception as e:
+            raise Exception(f"Failed to update plan: {str(e)}") 

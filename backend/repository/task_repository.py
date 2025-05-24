@@ -1,6 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update
+from sqlalchemy import select, update, and_
 from typing import List, Optional
+from datetime import date
 
 from models import Task
 
@@ -34,5 +35,37 @@ class TaskRepository:
 
     async def get_user_tasks(self, user_id: int) -> List[Task]:
         query = select(Task).where(Task.user_id == user_id)
+        result = await self.session.execute(query)
+        return result.scalars().all()
+
+    async def get_tasks_by_date_range(
+        self,
+        user_id: int,
+        start_date: date,
+        end_date: date
+    ) -> List[Task]:
+        """Получает задачи пользователя в указанном диапазоне дат"""
+        query = select(Task).where(
+            and_(
+                Task.user_id == user_id,
+                Task.due_date >= start_date,
+                Task.due_date <= end_date
+            )
+        ).order_by(Task.due_date)
+        result = await self.session.execute(query)
+        return result.scalars().all()
+
+    async def get_tasks_by_status(
+        self,
+        user_id: int,
+        status: str
+    ) -> List[Task]:
+        """Получает задачи пользователя по статусу"""
+        query = select(Task).where(
+            and_(
+                Task.user_id == user_id,
+                Task.status == status
+            )
+        ).order_by(Task.due_date)
         result = await self.session.execute(query)
         return result.scalars().all() 
