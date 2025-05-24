@@ -14,3 +14,77 @@
 /backend/.env.test
 /backend/.env.development.local
 /backend/.env.production.local.env
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.env
+
+# Frontend specific
+/frontend/.env
+/frontend/.env.local
+/frontend/.env.development
+/frontend/.env.production
+/frontend/.env.test
+/frontend/.env.development.local
+/frontend/.env.production.local
+
+# Build output
+/frontend/dist
+/frontend/build
+/frontend/.next
+/frontend/out
+
+# Dependencies
+/frontend/node_modules
+/frontend/.pnp
+/frontend/.pnp.js
+
+# Testing
+/frontend/coverage
+/frontend/.nyc_output
+
+# Debug
+/frontend/npm-debug.log*
+/frontend/yarn-debug.log*
+/frontend/yarn-error.log*
+
+# IDE
+/frontend/.idea
+/frontend/.vscode
+/frontend/*.sublime-workspace
+/frontend/*.sublime-project
+
+# Misc
+/frontend/.DS_Store
+/frontend/.env.local
+/frontend/.env.development.local
+/frontend/.env.test.local
+/frontend/.env.production.local
+/frontend/.cache
+/frontend/.parcel-cache
+/frontend/.next
+/frontend/.nuxt
+/frontend/.output
+/frontend/.vercel
+/frontend/.netlify
