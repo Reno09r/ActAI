@@ -7,7 +7,7 @@ from dependencies import get_user_service
 from dto.user import LoginRequest, UserCreate, UserResponse
 from .security import Token, create_access_token, ACCESS_TOKEN_EXPIRE_MINUTES
 from services.user_service import UserService
-router = APIRouter(tags=["Authentication"])
+router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 @router.post("/login", response_model=Token)
 async def login_for_access_token(

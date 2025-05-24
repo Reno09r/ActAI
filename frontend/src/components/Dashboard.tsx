@@ -20,6 +20,8 @@ import {
   AlertTriangle, // For error display
   Loader2, // For loading state
 } from "lucide-react"
+import CreateProjectModal from "./CreateProjectModal"
+import { useAuth } from '../contexts/AuthContext'
 
 // --- INTERFACES (Adjusted to better match backend and handle nulls) ---
 interface Task {
@@ -77,12 +79,13 @@ interface CompletedMilestones {
 
 // Placeholder for your API token - in a real app, get this from auth context/storage
 const API_BASE_URL = "http://localhost:8003" // Assuming proxy or Next.js API route
-const TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJSZW5vIiwiZXhwIjoxNzQ4MTE5MTkxfQ.TkMqGj_88IWRFyFmR4h323tzF5MaylYVS1es25WCcdc" // Replace with your token retrieval mechanism
 
 const Dashboard: React.FC = () => {
+  const { token } = useAuth();
   const [projects, setProjects] = useState<Project[]>([])
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [error, setError] = useState<string | null>(null)
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
 
   const [selectedProject, setSelectedProject] = useState<Project | null>(null)
   const [expandedMilestone, setExpandedMilestone] = useState<number | null>(null)
@@ -103,57 +106,61 @@ const Dashboard: React.FC = () => {
   const [editingMilestone, setEditingMilestone] = useState<Milestone | null>(null)
   const [isSaving, setIsSaving] = useState(false)
 
-  useEffect(() => {
-    const fetchProjects = async () => {
-      setIsLoading(true)
-      setError(null)
-      try {
-        const response = await fetch(`${API_BASE_URL}/plans/`, {
-          headers: {
-            Authorization: `Bearer ${TOKEN}`,
-            "Content-Type": "application/json",
-          },
-        })
-        if (!response.ok) {
-          throw new Error(`Failed to fetch projects: ${response.statusText} (Status: ${response.status})`)
-        }
-        const data: Project[] = await response.json()
-        setProjects(data)
+  const handleCreateSuccess = () => {
+    // Перезагружаем список проектов после успешного создания
+    fetchProjects();
+  };
 
-        // Инициализируем completedTasks и completedMilestones на основе статусов
-        const initialCompletedTasks: CompletedTasks = {}
-        const initialCompletedMilestones: CompletedMilestones = {}
+  const fetchProjects = async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const response = await fetch(`${API_BASE_URL}/plans/`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      })
+      if (!response.ok) {
+        throw new Error(`Failed to fetch projects: ${response.statusText} (Status: ${response.status})`)
+      }
+      const data: Project[] = await response.json()
+      setProjects(data)
 
-        data.forEach(project => {
-          project.milestones.forEach(milestone => {
-            // Проверяем все задачи в milestone
-            const allTasksCompleted = milestone.tasks.every(task => task.status === "completed")
-            if (allTasksCompleted) {
-              initialCompletedMilestones[milestone.id] = true
+      // Инициализируем completedTasks и completedMilestones на основе статусов
+      const initialCompletedTasks: CompletedTasks = {}
+      const initialCompletedMilestones: CompletedMilestones = {}
+
+      data.forEach(project => {
+        project.milestones.forEach(milestone => {
+          const allTasksCompleted = milestone.tasks.every(task => task.status === "completed")
+          if (allTasksCompleted) {
+            initialCompletedMilestones[milestone.id] = true
+          }
+
+          milestone.tasks.forEach(task => {
+            if (task.status === "completed") {
+              initialCompletedTasks[task.id] = true
             }
-
-            milestone.tasks.forEach(task => {
-              if (task.status === "completed") {
-                initialCompletedTasks[task.id] = true
-              }
-            })
           })
         })
+      })
 
-        setCompletedTasks(initialCompletedTasks)
-        setCompletedMilestones(initialCompletedMilestones)
-      } catch (err) {
-        if (err instanceof Error) {
-          setError(err.message)
-        } else {
-          setError("An unknown error occurred")
-        }
-        console.error("Error fetching projects:", err)
-      } finally {
-        setIsLoading(false)
+      setCompletedTasks(initialCompletedTasks)
+      setCompletedMilestones(initialCompletedMilestones)
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(err.message)
+      } else {
+        setError("An unknown error occurred")
       }
+      console.error("Error fetching projects:", err)
+    } finally {
+      setIsLoading(false)
     }
+  }
 
+  useEffect(() => {
     fetchProjects()
   }, [])
 
@@ -234,7 +241,7 @@ const Dashboard: React.FC = () => {
       const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/status?status=${newStatus}`, {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${TOKEN}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       })
@@ -304,7 +311,7 @@ const Dashboard: React.FC = () => {
         fetch(`${API_BASE_URL}/tasks/${task.id}/status?status=${newStatus}`, {
           method: 'PATCH',
           headers: {
-            'Authorization': `Bearer ${TOKEN}`,
+            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
         })
@@ -487,7 +494,7 @@ const Dashboard: React.FC = () => {
       const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/`, {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${TOKEN}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(cleanUpdates),
@@ -547,7 +554,7 @@ const Dashboard: React.FC = () => {
       const response = await fetch(`${API_BASE_URL}/milestones/${milestoneId}/`, {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${TOKEN}`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(cleanUpdates),
@@ -617,20 +624,23 @@ const Dashboard: React.FC = () => {
   }
 
   return (
-    <div className="flex h-screen bg-gray-100"> {/* Changed bg to gray-100 for better contrast */}
+    <div className="flex h-screen bg-gray-100">
       {/* Sidebar */}
       <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
         {/* Header */}
         <div className="p-4 border-b border-gray-200">
-          {view === "projects" || !selectedProject ? ( // Handle case where selectedProject might be null
+          {view === "projects" || !selectedProject ? (
             <div>
               <h2 className="text-lg font-semibold text-gray-800">My Projects</h2>
-              <button className="w-full mt-3 flex items-center justify-between px-3 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors">
+              <button 
+                onClick={() => setIsCreateModalOpen(true)}
+                className="w-full mt-3 flex items-center justify-between px-3 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors"
+              >
                 <span className="font-medium">New Project</span>
                 <Plus className="h-4 w-4" />
               </button>
             </div>
-          ) : ( // selectedProject is not null
+          ) : (
             <div>
               <h2 className="text-lg font-semibold text-gray-800">{selectedProject.title}</h2>
               <div className="mt-2 space-y-1">
@@ -648,9 +658,9 @@ const Dashboard: React.FC = () => {
                   <Target className="h-4 w-4 mr-2 flex-shrink-0" />
                   <span>{selectedProject.difficulty_level || "N/A"}</span>
                 </div>
-                 <div className="flex items-center text-sm text-gray-600">
-                   <span className="inline-block h-4 w-4 mr-2 text-center font-bold text-blue-500">S</span> {/* Simple Status Icon */}
-                   <span>Status: {selectedProject.status || "N/A"}</span>
+                <div className="flex items-center text-sm text-gray-600">
+                  <span className="inline-block h-4 w-4 mr-2 text-center font-bold text-blue-500">S</span>
+                  <span>Status: {selectedProject.status || "N/A"}</span>
                 </div>
               </div>
               <div className="mt-3">
@@ -790,9 +800,9 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col bg-white"> {/* Main content bg white */}
+      <div className="flex-1 flex flex-col bg-white">
         {view !== "projects" && (
-          <div className="bg-gray-50 border-b border-gray-200 px-6 py-3"> {/* Lighter header for main content */}
+          <div className="bg-gray-50 border-b border-gray-200 px-6 py-3">
             <button onClick={goBack} className="flex items-center text-sm text-blue-600 hover:text-blue-800 transition-colors font-medium">
               <ArrowLeft className="h-4 w-4 mr-1.5" />
               <span>Back</span>
@@ -1158,6 +1168,13 @@ const Dashboard: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Create Project Modal */}
+      <CreateProjectModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={handleCreateSuccess}
+      />
     </div>
   )
 }

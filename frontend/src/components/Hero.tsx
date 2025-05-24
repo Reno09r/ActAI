@@ -1,8 +1,19 @@
 import React from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import TypedText from './TypedText';
 import { Brain, Target, Calendar, Trophy, ArrowRight } from 'lucide-react';
 
 const Hero: React.FC = () => {
+  const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+
+  const handleStartJourney = () => {
+    if (isAuthenticated) {
+      navigate('/dashboard');
+    }
+  };
+
   const goalExamples = [
     "I want to learn Python in 8 weeks",
     "I want to prepare for job interviews in 4 weeks",
@@ -32,12 +43,26 @@ const Hero: React.FC = () => {
           </p>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-3 rounded-full text-lg font-medium shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1">
-              Start Your Journey
-            </button>
-            <a href="#learn-more" className="bg-white hover:bg-gray-50 text-blue-500 border border-blue-200 px-8 py-3 rounded-full text-lg font-medium shadow-md hover:shadow-lg transition-all">
-              Learn More
-            </a>
+            {isAuthenticated ? (
+              <button
+                onClick={handleStartJourney}
+                className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-3 rounded-full text-lg font-medium shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1"
+              >
+                Go to Dashboard
+              </button>
+            ) : (
+              <>
+                <Link
+                  to="/register"
+                  className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-3 rounded-full text-lg font-medium shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1"
+                >
+                  Start Your Journey
+                </Link>
+                <a href="#learn-more" className="bg-white hover:bg-gray-50 text-blue-500 border border-blue-200 px-8 py-3 rounded-full text-lg font-medium shadow-md hover:shadow-lg transition-all">
+                  Learn More
+                </a>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -126,13 +151,23 @@ const Hero: React.FC = () => {
           </div>
 
           <div className="mt-16 text-center">
-            <a 
-              href="/register" 
-              className="inline-flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-8 py-3 rounded-full text-lg font-medium shadow-lg hover:shadow-xl transition-all"
-            >
-              Start Your Journey
-              <ArrowRight className="h-5 w-5" />
-            </a>
+            {isAuthenticated ? (
+              <button
+                onClick={handleStartJourney}
+                className="inline-flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-8 py-3 rounded-full text-lg font-medium shadow-lg hover:shadow-xl transition-all"
+              >
+                Go to Dashboard
+                <ArrowRight className="h-5 w-5" />
+              </button>
+            ) : (
+              <Link 
+                to="/register" 
+                className="inline-flex items-center gap-2 bg-blue-500 hover:bg-blue-600 text-white px-8 py-3 rounded-full text-lg font-medium shadow-lg hover:shadow-xl transition-all"
+              >
+                Start Your Journey
+                <ArrowRight className="h-5 w-5" />
+              </Link>
+            )}
           </div>
         </div>
       </div>

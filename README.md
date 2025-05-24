@@ -1,9 +1,9 @@
 # nFactorial-Ai-Cup-2025
 Fork this repository and build nFactorial Ai Cup 2025 projects 
 
-## < Your Name >
+## Букен Рауан 
 
-## < Your App's Name >
+## ActAI
 
 ## < Your App's description, technical considerations, etc. >
 
