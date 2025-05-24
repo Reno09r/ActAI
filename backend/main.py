@@ -5,25 +5,42 @@ import logging.config
 import traceback
 from auth import auth_router
 from database import saengine, Base, init_db
-from routers import user_router
+from routers import user_router, llm_router
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware import Middleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
+import sys
+import os
 
 # Настройка логирования
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+
+logger = logging.getLogger(__name__)
+
+# Создаем директорию для загрузок, если она не существует
+UPLOAD_DIR = Path("uploads")
+UPLOAD_DIR.mkdir(exist_ok=True)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     try:
-        print("Initializing database...")
+        # Инициализация базы данных
+        logger.info("Initializing database...")
         await init_db()
-        print("Database initialized successfully!")
-        print("Preloading models...")
-        print("All models loaded!")
+        logger.info("Database initialized successfully!")
+
     except Exception as e:
-        print(f"Error during startup: {str(e)}")
-        print(traceback.format_exc())
+        logger.error(f"Error during startup: {str(e)}")
+        logger.error(traceback.format_exc())
         raise
     yield
 
@@ -31,29 +48,38 @@ app = FastAPI(
     lifespan=lifespan,
     middleware=[
         Middleware(GZipMiddleware, minimum_size=1000),
-    ]
+    ],
+    title="ActAI API",
+    description="API для ActAI - системы планирования обучения и мотивации",
+    version="1.0.0"
 )
 
-@app.exception_handler(Exception)
-async def global_exception_handler(request: Request, exc: Exception):
-    print(f"Global error handler caught: {str(exc)}")
-    print(traceback.format_exc())
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Internal server error", "error": str(exc)}
-    )
-
+# Настройка CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # В продакшене заменить на конкретные домены
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Монтируем статические файлы
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Global error handler caught: {str(exc)}")
+    logger.error(traceback.format_exc())
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error", "error": str(exc)}
+    )
+
 app.include_router(auth_router.router)
 app.include_router(user_router.router)
+app.include_router(llm_router.router)
 
 if __name__=='__main__':
-    print("Starting application...")
+    logger.info("Starting application...")
     uvicorn.run("main:app", reload=True, workers=3, port=8003)

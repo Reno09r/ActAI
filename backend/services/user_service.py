@@ -42,6 +42,12 @@ class UserService:
             return None
         return UserResponse.model_validate(user)
 
+    async def get_user_by_username(self, username: str) -> Optional[UserResponse]:
+        user = await self.repository.get_by_username(username)
+        if not user:
+            return None
+        return UserResponse.model_validate(user)
+
     async def update_user(self, user_id: int, user_data: UserUpdate) -> Optional[UserResponse]:
         # Проверяем длину пароля, если он предоставлен
         if user_data.password and len(user_data.password) < 8:

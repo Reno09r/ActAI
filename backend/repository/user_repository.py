@@ -17,7 +17,7 @@ class UserRepository:
             email=user_data.email,
             username=user_data.username,
             is_active=user_data.is_active,
-            password_hash=user_data.password,  # Note: password should be hashed in service layer
+            password_hash=user_data.password,
             created_at=now,
             updated_at=now
         )
