@@ -82,10 +82,10 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": "Internal server error", "error": str(exc)}
     )
 
-app.include_router(auth_router.router)
-app.include_router(user_router)
-app.include_router(plan_router)
-app.include_router(task_router)
-app.include_router(milestone_router)
-app.include_router(daily_checkin_router.router)
-app.include_router(audio_router)
+app.include_router(auth_router.router,  prefix="/api")
+app.include_router(user_router, prefix="/api")
+app.include_router(plan_router, prefix="/api")
+app.include_router(task_router, prefix="/api")
+app.include_router(milestone_router, prefix="/api")
+app.include_router(daily_checkin_router.router, prefix="/api")
+app.include_router(audio_router, prefix="/api")
