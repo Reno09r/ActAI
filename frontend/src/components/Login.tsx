@@ -28,7 +28,7 @@ const Login: React.FC = () => {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.detail || 'Ошибка входа');
+        throw new Error(data.detail || 'Login error');
       }
 
       // Получаем информацию о пользователе
@@ -39,7 +39,7 @@ const Login: React.FC = () => {
       });
 
       if (!userResponse.ok) {
-        throw new Error('Ошибка получения данных пользователя');
+        throw new Error('Error getting user data');
       }
 
       const userData = await userResponse.json();
@@ -50,7 +50,7 @@ const Login: React.FC = () => {
       // Перенаправляем на дашборд
       navigate('/dashboard');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Произошла ошибка при входе');
+      setError(err instanceof Error ? err.message : 'An error occurred during login');
     } finally {
       setLoading(false);
     }

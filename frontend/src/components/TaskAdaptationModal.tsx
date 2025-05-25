@@ -34,7 +34,7 @@ const TaskAdaptationModal: React.FC<TaskAdaptationModalProps> = ({
         onClose();
       }, 500);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Произошла ошибка при адаптации задачи');
+      setError(err instanceof Error ? err.message : 'An error occurred during task adaptation');
     } finally {
       setIsLoading(false);
     }
@@ -53,7 +53,7 @@ const TaskAdaptationModal: React.FC<TaskAdaptationModalProps> = ({
       <div className="bg-white rounded-lg p-6 w-full max-w-lg">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold text-gray-800">
-            Адаптация задачи: {taskTitle}
+            Adaptation of the task: {taskTitle}
           </h2>
           <button
             onClick={handleClose}
@@ -73,14 +73,14 @@ const TaskAdaptationModal: React.FC<TaskAdaptationModalProps> = ({
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Опишите проблему или что нужно изменить:
+            Describe the problem or what needs to be changed:
             </label>
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               rows={4}
-              placeholder="Например: 'Не успеваю выполнить задачу в срок' или 'Задача оказалась сложнее, чем ожидалось'"
+              placeholder="For example: 'I can't finish the task on time' or 'The task turned out to be more difficult than expected'"
               disabled={isLoading}
             />
           </div>
@@ -102,10 +102,10 @@ const TaskAdaptationModal: React.FC<TaskAdaptationModalProps> = ({
               {isLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin inline" />
-                  Адаптация...
+                  Adaptation...
                 </>
               ) : (
-                'Адаптировать задачу'
+                'Adapt task'
               )}
             </button>
           </div>
