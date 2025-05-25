@@ -33,7 +33,7 @@ const CreateProjectModal: React.FC<CreateProjectModalProps> = ({ isOpen, onClose
         duration: `${formData.duration} weeks`
       };
 
-      const response = await fetch('http://localhost:8003/plans/', {
+      const response = await fetch('/api/plans/', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

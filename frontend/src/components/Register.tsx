@@ -18,7 +18,7 @@ const Register: React.FC = () => {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8003/auth/register', {
+      const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -33,7 +33,7 @@ const Register: React.FC = () => {
       }
 
       // После успешной регистрации выполняем вход
-      const loginResponse = await fetch('http://localhost:8003/auth/login', {
+      const loginResponse = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -48,7 +48,7 @@ const Register: React.FC = () => {
       }
 
       // Получаем информацию о пользователе
-      const userResponse = await fetch('http://localhost:8003/users/me', {
+      const userResponse = await fetch('/api/users/me', {
         headers: {
           'Authorization': `Bearer ${loginData.access_token}`,
         },

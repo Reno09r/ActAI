@@ -13,7 +13,7 @@ interface DailyCheckin {
   productivity_score: number;
 }
 
-const API_BASE_URL = "http://localhost:8003";
+const API_BASE_URL = "/api";
 
 const DailyCheckin = () => {
   const { token } = useAuth();

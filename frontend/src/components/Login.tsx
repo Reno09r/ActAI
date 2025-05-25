@@ -17,7 +17,7 @@ const Login: React.FC = () => {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8003/auth/login', {
+      const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -32,7 +32,7 @@ const Login: React.FC = () => {
       }
 
       // Получаем информацию о пользователе
-      const userResponse = await fetch('http://localhost:8003/users/me', {
+      const userResponse = await fetch('/api/users/me', {
         headers: {
           'Authorization': `Bearer ${data.access_token}`,
         },

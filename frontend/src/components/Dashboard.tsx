@@ -89,7 +89,7 @@ interface CompletedMilestones {
 }
 
 // Placeholder for your API token - in a real app, get this from auth context/storage
-const API_BASE_URL = "http://localhost:8003" // Assuming proxy or Next.js API route
+const API_BASE_URL = "/api" // Assuming proxy or Next.js API route
 
 // Добавляем новый интерфейс для задач по срокам
 interface TasksByDate {
@@ -221,8 +221,21 @@ const Dashboard: React.FC = () => {
     }
   }
   const getTaskStatus = (task: Task): TaskStatus => {
-    // Возвращаем статус из самой задачи, а не из локальных состояний
-    return task.status as TaskStatus;
+    // Проверяем актуальный статус из объекта задачи
+    if (task.status) {
+      return task.status as TaskStatus;
+    }
+    
+    // Fallback на локальные состояния
+    if (completedTasks[task.id]) {
+      return "completed";
+    }
+    
+    if (inProgressTasks.some(t => t.id === task.id)) {
+      return "in_progress";
+    }
+    
+    return "pending";
   };
   
   // Обновляем функцию fetchTasksByDate
@@ -382,7 +395,7 @@ const Dashboard: React.FC = () => {
   const calculateProjectProgress = (project: Project): number => {
     let totalTasks = 0;
     let completedTasksCount = 0;
-
+  
     project.milestones.forEach(milestone => {
       milestone.tasks.forEach(task => {
         totalTasks++;
@@ -391,8 +404,18 @@ const Dashboard: React.FC = () => {
         }
       });
     });
-
-    return totalTasks > 0 ? Math.round((completedTasksCount / totalTasks) * 100) : 0;
+  
+    if (totalTasks === 0) return 0;
+    
+    const progress = (completedTasksCount / totalTasks) * 100;
+    
+    // Умное округление
+    const rounded = Math.round(progress);
+    if (Math.abs(progress - rounded) < 0.1) {
+      return rounded;
+    }
+    
+    return Math.round(progress * 10) / 10;
   };
 
   // Добавляем функцию для поиска проекта по ID задачи
@@ -422,83 +445,15 @@ const Dashboard: React.FC = () => {
         throw new Error(`Failed to update task status: ${response.statusText}`);
       }
   
-      // Обновляем локальные состояния на основе нового статуса
-      if (newStatus === "in_progress") {
-        setInProgressTasks(prev => {
-          const exists = prev.some(task => task.id === taskId);
-          if (!exists) {
-            return [...prev, { id: taskId } as Task];
-          }
-          return prev;
-        });
-        setCompletedTasks(prev => ({ ...prev, [taskId]: false }));
-      } else if (newStatus === "completed") {
-        setInProgressTasks(prev => prev.filter(task => task.id !== taskId));
-        setCompletedTasks(prev => ({ ...prev, [taskId]: true }));
-      } else { // pending
-        setInProgressTasks(prev => prev.filter(task => task.id !== taskId));
-        setCompletedTasks(prev => ({ ...prev, [taskId]: false }));
-      }
+      // Немедленно обновляем локальные состояния
+      updateLocalTaskStates(taskId, newStatus);
+      
+      // Обновляем задачи во всех представлениях
+      updateTaskInAllViews(taskId, newStatus);
+      
+      // Обновляем проект и milestone
+      updateProjectAndMilestone(taskId, newStatus);
   
-      // Обновляем задачи в tasksByDate
-      setTasksByDate(prev => ({
-        today: prev.today.map(task => 
-          task.id === taskId ? { ...task, status: newStatus } : task
-        ),
-        tomorrow: prev.tomorrow.map(task => 
-          task.id === taskId ? { ...task, status: newStatus } : task
-        ),
-        upcoming: prev.upcoming.map(task => 
-          task.id === taskId ? { ...task, status: newStatus } : task
-        )
-      }));
-  
-      // Находим проект, которому принадлежит задача
-      const project = findProjectByTaskId(taskId);
-      if (project) {
-        // Обновляем проект и milestone
-        const updatedProject = {
-          ...project,
-          milestones: project.milestones.map(milestone => {
-            const updatedTasks = milestone.tasks.map(task => 
-              task.id === taskId ? { ...task, status: newStatus } : task
-            );
-            
-            const updatedMilestone = {
-              ...milestone,
-              tasks: updatedTasks
-            };
-  
-            // Обновляем статус milestone
-            const allTasksCompleted = updatedTasks.every(task => task.status === "completed");
-            setCompletedMilestones(prev => ({
-              ...prev,
-              [milestone.id]: allTasksCompleted
-            }));
-  
-            return updatedMilestone;
-          })
-        };
-  
-        // Обновляем прогресс проекта
-        const newProgress = calculateProjectProgress(updatedProject);
-        updatedProject.progress_percentage = newProgress;
-  
-        // Обновляем состояние проекта
-        if (selectedProject?.id === project.id) {
-          setSelectedProject(updatedProject);
-        }
-  
-        // Обновляем выбранную задачу, если она изменилась
-        if (selectedTask?.id === taskId) {
-          setSelectedTask(prev => prev ? { ...prev, status: newStatus } : null);
-        }
-  
-        // Обновляем проект в списке проектов
-        setProjects(prev => prev.map(p => 
-          p.id === project.id ? updatedProject : p
-        ));
-      }
     } catch (err) {
       setUpdateError(err instanceof Error ? err.message : 'Failed to update task status');
       console.error('Error updating task status:', err);
@@ -506,7 +461,110 @@ const Dashboard: React.FC = () => {
       setUpdatingTaskId(null);
     }
   };
+  
+  // Вспомогательная функция для обновления локальных состояний
+  const updateLocalTaskStates = (taskId: number, newStatus: TaskStatus) => {
+    if (newStatus === "in_progress") {
+      setInProgressTasks(prev => {
+        const exists = prev.some(task => task.id === taskId);
+        if (!exists) {
+          const task = findTaskById(taskId);
+          if (task) {
+            return [...prev, task];
+          }
+        }
+        return prev;
+      });
+      setCompletedTasks(prev => ({ ...prev, [taskId]: false }));
+    } else if (newStatus === "completed") {
+      setInProgressTasks(prev => prev.filter(task => task.id !== taskId));
+      setCompletedTasks(prev => ({ ...prev, [taskId]: true }));
+    } else { // pending
+      setInProgressTasks(prev => prev.filter(task => task.id !== taskId));
+      setCompletedTasks(prev => ({ ...prev, [taskId]: false }));
+    }
+  };
+  
+  // Вспомогательная функция для обновления задач во всех представлениях
+  const updateTaskInAllViews = (taskId: number, newStatus: TaskStatus) => {
+    // Обновляем задачи в tasksByDate
+    setTasksByDate(prev => ({
+      today: prev.today.map(task => 
+        task.id === taskId ? { ...task, status: newStatus } : task
+      ),
+      tomorrow: prev.tomorrow.map(task => 
+        task.id === taskId ? { ...task, status: newStatus } : task
+      ),
+      upcoming: prev.upcoming.map(task => 
+        task.id === taskId ? { ...task, status: newStatus } : task
+      )
+    }));
+  
+    // Обновляем выбранную задачу, если она изменилась
+    if (selectedTask?.id === taskId) {
+      setSelectedTask(prev => prev ? { ...prev, status: newStatus } : null);
+    }
+  };
+  
+  // Вспомогательная функция для обновления проекта и milestone
+  const updateProjectAndMilestone = (taskId: number, newStatus: TaskStatus) => {
+    const project = findProjectByTaskId(taskId);
+    if (!project) return;
 
+    // Обновляем проект и milestone
+    const updatedProject = {
+      ...project,
+      milestones: project.milestones.map(milestone => {
+        const updatedTasks = milestone.tasks.map(task =>
+          task.id === taskId ? { ...task, status: newStatus } : task
+        );
+
+        const updatedMilestone = {
+          ...milestone,
+          tasks: updatedTasks
+        };
+
+        // Обновляем статус milestone
+        // Check if ALL tasks in this specific milestone are now completed
+        const allTasksInThisMilestoneCompleted =
+          updatedTasks.length > 0 && // Ensure milestone is not empty
+          updatedTasks.every(task => task.status === "completed");
+
+        setCompletedMilestones(prev => ({
+          ...prev,
+          [milestone.id]: allTasksInThisMilestoneCompleted
+        }));
+
+        return updatedMilestone;
+      })
+    };
+
+    // Обновляем прогресс проекта
+    const newProgress = calculateProjectProgress(updatedProject);
+    updatedProject.progress_percentage = newProgress;
+
+    // Обновляем состояние проекта
+    if (selectedProject?.id === project.id) {
+      setSelectedProject(updatedProject);
+
+      // --- !! KEY CHANGE IS HERE !! ---
+      // If the currently viewed milestone (selectedMilestone) belongs to the updated project,
+      // we need to update selectedMilestone state as well, so it re-renders with the fresh task data.
+      if (selectedMilestone) {
+        // Find the updated version of the selected milestone from the updated project data
+        const refreshedSelectedMilestone = updatedProject.milestones.find(m => m.id === selectedMilestone.id);
+        if (refreshedSelectedMilestone) {
+          setSelectedMilestone(refreshedSelectedMilestone); // Update selectedMilestone state
+        }
+      }
+      // --- !! END OF KEY CHANGE !! ---
+    }
+
+    // Обновляем проект в списке проектов
+    setProjects(prev => prev.map(p =>
+      p.id === project.id ? updatedProject : p
+    ));
+  };
   // Обновляем компонент TasksByDateSection
   const TasksByDateSection = () => {
     if (isLoadingTasks) {
@@ -546,7 +604,7 @@ const Dashboard: React.FC = () => {
       <div className="bg-white rounded-lg shadow p-4 mb-4">
         <h3 className={`text-lg font-semibold mb-3 ${color}`}>{title}</h3>
         {tasks.length === 0 ? (
-          <p className="text-gray-500 text-sm">Нет задач</p>
+          <p className="text-gray-500 text-sm">No tasks</p>
         ) : (
           <div className="space-y-2">
             {tasks.map((task) => (
@@ -639,12 +697,12 @@ const Dashboard: React.FC = () => {
     const getStatusColor = () => {
       switch (currentStatus) {
         case 'completed':
-          return "bg-green-100 text-green-700";
+          return "bg-green-100 text-green-700 hover:bg-green-200";
         case 'in_progress':
-          return "bg-blue-100 text-blue-700";
+          return "bg-blue-100 text-blue-700 hover:bg-blue-200";
         case 'pending':
         default:
-          return "bg-gray-100 text-gray-700";
+          return "bg-gray-100 text-gray-700 hover:bg-gray-200";
       }
     };
   
@@ -660,23 +718,41 @@ const Dashboard: React.FC = () => {
       }
     };
   
+    const getNextStatus = () => {
+      switch (currentStatus) {
+        case 'pending':
+          return 'Start';
+        case 'in_progress':
+          return 'Complete';
+        case 'completed':
+          return 'Reset';
+        default:
+          return 'Start';
+      }
+    };
+  
     return (
       <button
-        onClick={() => toggleTaskCompletion(task.id)}
-        className={`p-2 rounded-full ${getStatusColor()} hover:opacity-80 transition-opacity flex items-center gap-1`}
+        onClick={(e) => {
+          e.stopPropagation(); // Предотвращаем всплытие события
+          toggleTaskCompletion(task.id);
+        }}
+        className={`p-2 rounded-full ${getStatusColor()} transition-all duration-200 flex items-center gap-1 text-xs font-medium`}
         disabled={updatingTaskId === task.id}
+        title={`Click to ${getNextStatus().toLowerCase()}`}
       >
         {updatingTaskId === task.id ? (
           <Loader2 className="w-4 h-4 animate-spin" />
         ) : (
           <>
             {getStatusIcon()}
-            <span className="text-xs font-medium">{getStatusText()}</span>
+            <span>{getStatusText()}</span>
           </>
         )}
       </button>
     );
   };
+  
   
 
   // Восстанавливаем функцию formatDate
@@ -1004,47 +1080,41 @@ const Dashboard: React.FC = () => {
       setIsSaving(false)
     }
   }
-
+  const findTaskById = (taskId: number): Task | undefined => {
+    for (const project of projects) {
+      for (const milestone of project.milestones) {
+        const task = milestone.tasks.find(t => t.id === taskId);
+        if (task) return task;
+      }
+    }
+    return undefined;
+  };
   // Восстанавливаем функцию toggleTaskCompletion
   const toggleTaskCompletion = async (taskId: number) => {
-    try {
-      setUpdatingTaskId(taskId);
-      setUpdateError(null);
-      
-      // Получаем текущий статус задачи из реальных данных
-      let currentStatus: TaskStatus = "pending";
-      
-      // Ищем задачу в tasksByDate
-      const allTasks = [...tasksByDate.today, ...tasksByDate.tomorrow, ...tasksByDate.upcoming];
-      const foundTask = allTasks.find(task => task.id === taskId);
-      
-      if (foundTask) {
-        currentStatus = foundTask.status as TaskStatus;
-      } else if (selectedProject) {
-        // Ищем в выбранном проекте
-        for (const milestone of selectedProject.milestones) {
-          const task = milestone.tasks.find(t => t.id === taskId);
-          if (task) {
-            currentStatus = task.status as TaskStatus;
-            break;
-          }
-        }
-      }
-      
-      // Определяем следующий статус в циклической последовательности
-      const statusCycle: TaskStatus[] = ["pending", "in_progress", "completed"];
-      const currentIndex = statusCycle.indexOf(currentStatus);
-      const nextIndex = (currentIndex + 1) % statusCycle.length;
-      const newStatus = statusCycle[nextIndex];
-      
-      await toggleTaskStatus(taskId, newStatus);
-    } catch (err) {
-      setUpdateError(err instanceof Error ? err.message : 'Failed to update task status');
-      console.error('Error updating task status:', err);
-    } finally {
-      setUpdatingTaskId(null);
+    const task = findTaskById(taskId);
+    if (!task) return;
+    
+    const currentStatus = getTaskStatus(task);
+    let newStatus: TaskStatus;
+    
+    // Циклическое переключение: pending -> in_progress -> completed -> pending
+    switch (currentStatus) {
+      case "pending":
+        newStatus = "in_progress";
+        break;
+      case "in_progress":
+        newStatus = "completed";
+        break;
+      case "completed":
+        newStatus = "pending";
+        break;
+      default:
+        newStatus = "pending";
     }
+    
+    await toggleTaskStatus(taskId, newStatus);
   };
+  
 
   // Добавляем функцию updateProject
   const updateProject = async (projectId: number, updates: Partial<Project>) => {
@@ -1292,11 +1362,11 @@ const Dashboard: React.FC = () => {
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div
                     className="bg-blue-500 h-2 rounded-full transition-all duration-500"
-                    style={{ width: `${selectedProject.progress_percentage}%` }}
+                    style={{ width: `${Math.round(selectedProject.progress_percentage)}%` }}
                   />
                 </div>
                 <div className="mt-1 text-xs text-gray-600 text-right">
-                  {selectedProject.progress_percentage}% Complete
+                  {Math.round(selectedProject.progress_percentage)}% Complete
                 </div>
               </div>
             </div>
@@ -1330,7 +1400,7 @@ const Dashboard: React.FC = () => {
                               style={{ width: `${project.progress_percentage}%` }}
                             />
                           </div>
-                          <span className="text-xs text-gray-500">{project.progress_percentage}%</span>
+                          <span className="text-xs text-gray-500">{Math.round(project.progress_percentage)}%</span>
                         </div>
                       </div>
                     </div>
@@ -1652,7 +1722,7 @@ const Dashboard: React.FC = () => {
               <div className="space-y-4">
                 <h2 className="text-xl font-semibold text-gray-700">Tasks ({selectedMilestone.tasks.length})</h2>
                 {selectedMilestone.tasks.length === 0 && (
-                    <p className="p-4 text-center text-gray-500 bg-gray-50 rounded-md">No tasks defined for this milestone.</p>
+                  <p className="p-4 text-center text-gray-500 bg-gray-50 rounded-md">No tasks defined for this milestone.</p>
                 )}
                 {selectedMilestone.tasks.map((task) => (
                   <div
@@ -1665,7 +1735,11 @@ const Dashboard: React.FC = () => {
                         <button onClick={() => openTask(task)} className="text-left flex-1 group">
                           <h4
                             className={`font-medium group-hover:text-blue-600 ${
-                              completedTasks[task.id] ? "line-through text-gray-500" : "text-gray-800"
+                              task.status === "completed" 
+                                ? "line-through text-gray-500" 
+                                : task.status === "in_progress"
+                                  ? "text-blue-600"
+                                  : "text-gray-800"
                             }`}
                           >
                             {task.title}
@@ -1682,12 +1756,24 @@ const Dashboard: React.FC = () => {
                                   ? "bg-red-100 text-red-700"
                                   : task.priority === "medium"
                                     ? "bg-yellow-100 text-yellow-700"
-                                    : task.priority === "low" 
-                                      ? "bg-green-100 text-green-700" 
+                                    : task.priority === "low"
+                                      ? "bg-green-100 text-green-700"
                                       : "bg-gray-100 text-gray-700"
                               }`}
                             >
                               {task.priority || "N/A"}
+                            </span>
+                            {/* Добавляем индикатор статуса */}
+                            <span
+                              className={`px-2 py-0.5 rounded-full font-medium text-xs ${
+                                task.status === "completed"
+                                  ? "bg-green-100 text-green-700"
+                                  : task.status === "in_progress"
+                                    ? "bg-blue-100 text-blue-700"
+                                    : "bg-gray-100 text-gray-700"
+                              }`}
+                            >
+                              {formatTaskStatus(task.status)}
                             </span>
                           </div>
                         </button>
