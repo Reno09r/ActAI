@@ -73,10 +73,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Монтируем статические файлы
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
-
-
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Global error handler caught: {str(exc)}")
@@ -93,6 +89,3 @@ app.include_router(task_router)
 app.include_router(milestone_router)
 app.include_router(daily_checkin_router.router)
 app.include_router(audio_router)
-if __name__=='__main__':
-    logger.info("Starting application...")
-    uvicorn.run("main:app", reload=True, workers=3, port=8003)
